@@ -7,7 +7,7 @@ from typing import Any, List
 from datetime import datetime
 
 class HourlyData(BaseModel):
-    time: List[str]
+    time: List[datetime]
     temperature_2m: List[float]
 
 class WeatherResponse(BaseModel):
@@ -44,17 +44,43 @@ async def fetch_weather_data():
             print("Unexpected Error:", e)
             raise
 
-# # Function to process the hourly data into a Pandas DataFrame
-# def process_hourly_data(weather_data: WeatherResponse):
-#     hourly = weather_data.hourly
-#     hourly_data = {
-#         "date": pd.to_datetime(hourly.time),
-#         "temperature_2m": hourly.temperature_2m,
-#     }
-#     hourly_dataframe = pd.DataFrame(data=hourly_data)
-#     return hourly_dataframe
+from scipy.interpolate import make_splrep, splev
 
 
+import pandas as pd
+import numpy as np
+from scipy.interpolate import interp1d
+
+def interpolate_temperature(hourly_dataframe: pd.DataFrame, frequency="H"):
+    # Resample to create regular intervals
+    hourly_dataframe.set_index('datetime', inplace=True)
+    
+    # Create new regular time index with desired frequency
+    new_index = pd.date_range(start=hourly_dataframe.index.min(),
+                              end=hourly_dataframe.index.max(),
+                              freq=frequency)
+    
+    # Reindex with the new regular index
+    interpolated_df = hourly_dataframe.reindex(new_index)
+
+    # Linearly interpolate missing values
+    interpolated_temperatures = interp1d(
+        x=hourly_dataframe.index.values.astype(np.int64), 
+        y=hourly_dataframe.temperature_2m.values, 
+        bounds_error=False,
+        fill_value="extrapolate")(interpolated_df.index.values.astype(np.int64))
+    
+    interpolated_df["temperature_2m"] = interpolated_temperatures
+    
+    # Reset index
+    interpolated_df.reset_index(inplace=True)
+    interpolated_df.rename(columns={'index': 'datetime'}, inplace=True)
+    
+    return interpolated_df
+
+# Example usage with original DataFrame and desired number of points
+# hourly_dataframe = ...  # Your original DataFrame
+# interpolated_df = interpolate_temperature(hourly_dataframe, num_points=20000)
 def process_hourly_data(weather_data: WeatherResponse):
     hourly = weather_data.hourly
     # Convert the time strings to datetime objects
@@ -63,6 +89,10 @@ def process_hourly_data(weather_data: WeatherResponse):
         "temperature_2m": hourly.temperature_2m,
     }
     hourly_dataframe = pd.DataFrame(data=hourly_data)
+
+    print(hourly_dataframe.info())
+
+    hourly_dataframe = interpolate_temperature(hourly_dataframe, "min")
 
     # Create separate columns for date and time
     hourly_dataframe["date"] = hourly_dataframe["datetime"].dt.date
@@ -74,12 +104,11 @@ def process_hourly_data(weather_data: WeatherResponse):
     max_temp = pivoted_dataframe.max().max()
 
     if max_temp > min_temp:
-        pivoted_dataframe = (pivoted_dataframe - min_temp) / (max_temp - min_temp) * 256
+        pivoted_dataframe = (pivoted_dataframe - min_temp) / (max_temp - min_temp) * 255
     else:
         pivoted_dataframe = pivoted_dataframe * 0
 
     return pivoted_dataframe
-
 
 def original(hourly_dataframe: pd.DataFrame) -> np.ndarray[Any]:
 
