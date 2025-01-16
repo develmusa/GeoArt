@@ -3,7 +3,7 @@ from PIL import Image
 import httpx
 import pandas as pd
 from pydantic import BaseModel, ValidationError
-from typing import List
+from typing import Any, List
 from datetime import datetime
 
 class HourlyData(BaseModel):
@@ -80,6 +80,31 @@ def process_hourly_data(weather_data: WeatherResponse):
 
     return pivoted_dataframe
 
+
+def original(hourly_dataframe: pd.DataFrame) -> np.ndarray[Any]:
+
+    # Flatten the pivoted DataFrame and handle NaN values (use zero for NaNs here)
+    flattened_data = hourly_dataframe.fillna(0).to_numpy().flatten()
+
+    # Specify desired dimensions for the image
+    desired_width = hourly_dataframe.shape[1]  # Define as per your requirement
+    desired_height = hourly_dataframe.shape[0]  # Define as per your requirement
+
+    # Ensure the data fits into the specified dimensions
+    total_pixels = desired_width * desired_height
+    flattened_data_size = len(flattened_data)
+
+    if flattened_data_size < total_pixels:
+        # If there are not enough data points, pad with zeros
+        flattened_data = np.append(flattened_data, np.zeros(total_pixels - flattened_data_size))
+    elif flattened_data_size > total_pixels:
+        # If there are too many data points, truncate the array
+        flattened_data = flattened_data[:total_pixels]
+
+    # Reshape and convert to a NumPy array of the correct type
+    return flattened_data.reshape((desired_height, desired_width)).astype(np.uint8)
+
+
 if __name__ == "__main__":
     import asyncio
 
@@ -93,26 +118,7 @@ if __name__ == "__main__":
         hourly_dataframe = process_hourly_data(weather_data)
         print(hourly_dataframe)
 
-        # Flatten the pivoted DataFrame and handle NaN values (use zero for NaNs here)
-        flattened_data = hourly_dataframe.fillna(0).to_numpy().flatten()
-
-        # Specify desired dimensions for the image
-        desired_width = 24  # Define as per your requirement
-        desired_height = 360  # Define as per your requirement
-
-        # Ensure the data fits into the specified dimensions
-        total_pixels = desired_width * desired_height
-        flattened_data_size = len(flattened_data)
-
-        if flattened_data_size < total_pixels:
-            # If there are not enough data points, pad with zeros
-            flattened_data = np.append(flattened_data, np.zeros(total_pixels - flattened_data_size))
-        elif flattened_data_size > total_pixels:
-            # If there are too many data points, truncate the array
-            flattened_data = flattened_data[:total_pixels]
-
-        # Reshape and convert to a NumPy array of the correct type
-        image_array = flattened_data.reshape((desired_height, desired_width)).astype(np.uint8)
+        image_array = original(hourly_dataframe)
 
         # Create and save the image
         image = Image.fromarray(image_array, mode='L')  # "L" for grayscale
