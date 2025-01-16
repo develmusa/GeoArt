@@ -1,6 +1,7 @@
 import httpx
 import pandas as pd
 from pydantic import BaseModel, ValidationError, Field
+from pydantic import BaseModel, ValidationError
 from typing import List
 from datetime import datetime
 
@@ -61,17 +62,22 @@ def process_hourly_data(weather_data: WeatherResponse):
         "temperature_2m": hourly.temperature_2m,
     }
     hourly_dataframe = pd.DataFrame(data=hourly_data)
-    
+
     # Create separate columns for date and time
     hourly_dataframe["date"] = hourly_dataframe["datetime"].dt.date
     hourly_dataframe["time"] = hourly_dataframe["datetime"].dt.time
-    
-    # Pivot the DataFrame to have dates as rows and time as columns
-    pivoted_dataframe = hourly_dataframe.pivot(index="date", columns="time", values="temperature_2m")
-    
-    return pivoted_dataframe
 
-# Main function
+    pivoted_dataframe = hourly_dataframe.pivot(index="date", columns="time", values="temperature_2m")
+
+    min_temp = pivoted_dataframe.min().min()
+    max_temp = pivoted_dataframe.max().max()
+
+    if max_temp > min_temp:
+        pivoted_dataframe = (pivoted_dataframe - min_temp) / (max_temp - min_temp) * 100
+    else:
+        pivoted_dataframe = pivoted_dataframe * 0
+
+    return pivoted_dataframe
 if __name__ == "__main__":
     import asyncio
 
@@ -81,8 +87,9 @@ if __name__ == "__main__":
         print(f"Elevation {weather_data.elevation} m asl")
         print(f"Timezone {weather_data.timezone} {weather_data.timezone_abbreviation}")
         print(f"Timezone difference to GMT+0 {weather_data.utc_offset_seconds} s")
-        
+
         hourly_dataframe = process_hourly_data(weather_data)
         print(hourly_dataframe)
+        print(hourly_dataframe.max())
 
     asyncio.run(main())
