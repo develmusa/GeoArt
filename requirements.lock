@@ -27,8 +27,11 @@ idna==3.10
     # via anyio
     # via httpx
 numpy==2.2.1
+    # via geoart
     # via pandas
 pandas==2.2.3
+    # via geoart
+pillow==11.1.0
     # via geoart
 pydantic==2.10.5
     # via geoart
