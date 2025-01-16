@@ -43,15 +43,33 @@ async def fetch_weather_data():
             print("Unexpected Error:", e)
             raise
 
-# Function to process the hourly data into a Pandas DataFrame
+# # Function to process the hourly data into a Pandas DataFrame
+# def process_hourly_data(weather_data: WeatherResponse):
+#     hourly = weather_data.hourly
+#     hourly_data = {
+#         "date": pd.to_datetime(hourly.time),
+#         "temperature_2m": hourly.temperature_2m,
+#     }
+#     hourly_dataframe = pd.DataFrame(data=hourly_data)
+#     return hourly_dataframe
+
 def process_hourly_data(weather_data: WeatherResponse):
     hourly = weather_data.hourly
+    # Convert the time strings to datetime objects
     hourly_data = {
-        "date": pd.to_datetime(hourly.time),
+        "datetime": pd.to_datetime(hourly.time),
         "temperature_2m": hourly.temperature_2m,
     }
     hourly_dataframe = pd.DataFrame(data=hourly_data)
-    return hourly_dataframe
+    
+    # Create separate columns for date and time
+    hourly_dataframe["date"] = hourly_dataframe["datetime"].dt.date
+    hourly_dataframe["time"] = hourly_dataframe["datetime"].dt.time
+    
+    # Pivot the DataFrame to have dates as rows and time as columns
+    pivoted_dataframe = hourly_dataframe.pivot(index="date", columns="time", values="temperature_2m")
+    
+    return pivoted_dataframe
 
 # Main function
 if __name__ == "__main__":
