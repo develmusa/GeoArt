@@ -6,7 +6,7 @@ class LocationPoint(BaseModel):
     longitude: float
 
 
-def address_to_goordinates(address: str) -> LocationPoint:
+def address_to_coordinates(address: str) -> LocationPoint:
     geolocator = Nominatim(user_agent="geoart")
     location = geolocator.geocode(address)
     if location is None:
