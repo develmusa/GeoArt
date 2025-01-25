@@ -44,38 +44,48 @@ async def fetch_weather_data():
             print("Unexpected Error:", e)
             raise
 
+
 from scipy.interpolate import make_splrep, splev
 
+def interpolate_temperature(hourly_dataframe: pd.DataFrame):
+    # Extract time as integers (e.g., seconds since start)
+    time_numeric = (hourly_dataframe["datetime"] - hourly_dataframe["datetime"].min()).dt.total_seconds()
 
-import pandas as pd
+    # Use scipy's make_splrep and splev for spline fitting and evaluation
+    # k=3 specifies a cubic spline
+    spl = make_splrep(time_numeric, hourly_dataframe["temperature_2m"], k=3)
+
+    # Evaluate the spline at the original time points
+    interpolated_temperature = splev(time_numeric, spl)
+
+    # Replace the original temperature values with the interpolated values
+    hourly_dataframe["temperature_2m"] = interpolated_temperature
+    
 import numpy as np
-from scipy.interpolate import interp1d
+import pandas as pd
 
-def interpolate_temperature(hourly_dataframe: pd.DataFrame, frequency="H"):
-    # Resample to create regular intervals
-    hourly_dataframe.set_index('datetime', inplace=True)
-    
-    # Create new regular time index with desired frequency
-    new_index = pd.date_range(start=hourly_dataframe.index.min(),
-                              end=hourly_dataframe.index.max(),
-                              freq=frequency)
-    
-    # Reindex with the new regular index
-    interpolated_df = hourly_dataframe.reindex(new_index)
+def interpolate_temperature(hourly_dataframe: pd.DataFrame, num_points: int):
+    # Extract time as numeric values (seconds since start)
+    time_numeric = (hourly_dataframe["datetime"] - hourly_dataframe["datetime"].min()).dt.total_seconds()
 
-    # Linearly interpolate missing values
-    interpolated_temperatures = interp1d(
-        x=hourly_dataframe.index.values.astype(np.int64), 
-        y=hourly_dataframe.temperature_2m.values, 
-        bounds_error=False,
-        fill_value="extrapolate")(interpolated_df.index.values.astype(np.int64))
+    # Create a B-spline representation with a specified degree (k=3 for cubic)
+    spl = make_splrep(time_numeric, hourly_dataframe["temperature_2m"], k=3)
+
+    # Generate additional time points for interpolation
+    new_time_numeric = np.linspace(time_numeric.min(), time_numeric.max(), 24*365)
     
-    interpolated_df["temperature_2m"] = interpolated_temperatures
-    
-    # Reset index
-    interpolated_df.reset_index(inplace=True)
-    interpolated_df.rename(columns={'index': 'datetime'}, inplace=True)
-    
+    # Evaluate the spline at the new time points
+    interpolated_temperature = spl(new_time_numeric)
+
+    # Convert new_time_numeric to datetime
+    additional_times = pd.to_timedelta(new_time_numeric, unit='s') + hourly_dataframe["datetime"].min()
+
+    # Create a new DataFrame with the interpolated data
+    interpolated_df = pd.DataFrame({
+        "datetime": additional_times,
+        "temperature_2m": interpolated_temperature
+    })
+
     return interpolated_df
 
 # Example usage with original DataFrame and desired number of points
@@ -91,8 +101,9 @@ def process_hourly_data(weather_data: WeatherResponse):
     hourly_dataframe = pd.DataFrame(data=hourly_data)
 
     print(hourly_dataframe.info())
+    print(hourly_dataframe)
 
-    hourly_dataframe = interpolate_temperature(hourly_dataframe, "min")
+    # hourly_dataframe = interpolate_temperature(hourly_dataframe, 30)
 
     # Create separate columns for date and time
     hourly_dataframe["date"] = hourly_dataframe["datetime"].dt.date
