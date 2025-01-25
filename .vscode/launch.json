@@ -10,6 +10,17 @@
             "request": "launch",
             "module": "geoart",
             "justMyCode": true
+        },
+        {
+            "name": "Streamlit",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "streamlit",
+            "args": [
+                "run",
+                "src/streamlit-geoart/app.py"
+            ]
+
         }
     ]
 }

@@ -6,7 +6,8 @@
         {
             "label": "Start streamlit app",
             "type": "shell",
-            "command": "rye run streamlit run src/streamlit-geoart/app.py"
+            "command": "rye run streamlit run src/streamlit-geoart/app.py",
+            "problemMatcher": []
         }
     ]
 }

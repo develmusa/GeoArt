@@ -38,5 +38,6 @@ def test_address_to_coordinates_service_geocoder_coordinates_valid():
     expected_location = LocationPoint(latitude=28.62, longitude=77.32)
 
     location = address_to_coordinates(address)
+    dump = location.model_dump()
     assert pytest.approx(location.latitude, 0.01) == expected_location.latitude
     assert pytest.approx(location.longitude, 0.01) == expected_location.longitude
