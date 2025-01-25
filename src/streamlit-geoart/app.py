@@ -1,9 +1,9 @@
 import streamlit as st
-import time
-import geoart.geolocation as geolocation
-from streamlit_keplergl import keplergl_static
-from keplergl import KeplerGl
-import pandas as pd
+
+import datetime
+from geoart.processor import generate_year_temp_art, ProcessData
+
+
 st.set_page_config(
     page_title="GeoArt", page_icon="🗺️", initial_sidebar_state="collapsed"
 )
@@ -11,25 +11,36 @@ st.set_page_config(
 st.title('GeoArt')
 
 st.write("""
-    # Year Temperatures
+    # One Year Temperatures
     GeoArt is a tool for creating and sharing geospatial art.
     """)
 
 coordinates = None
 
-
-# if not st.session_state:
 form = st.form(key="form_settings")
-address = form.text_input(label="Location" , key="location")
-form = form.form_submit_button(label="Submit")
-if form:
-    with st.status("Creating Arte...", expanded=True) as status:
-        st.write("Get Location Coordinates...")
-        coordinates = geolocation.address_to_coordinates(address=address)
-        status.update(
-            # label=f"Download complete!", state="complete" 
-            label=f"Download complete!", state="complete", expanded=False
-        )
-    # st.map( coordinates, zoom=15)
+address = form.text_input(label="Location", key="location")
+start_date = form.date_input("Start Date", datetime.date(2019, 7, 6))
+form_submit = form.form_submit_button(label="Submit")
 
-    st.map(data=pd.DataFrame([coordinates.model_dump()]))
+if form_submit:
+    with st.status("Creating Arte...", expanded=True) as status:
+        def status_progress_callback(message: str):
+            status.update(label=message, state="running")
+
+        def status_error_callback(message: str):
+            status.update(label=message, state="error")
+
+        def status_success_callback(message: str, data: ProcessData):
+            status.update(label=message, state="complete", expanded=False)
+            status.write(data)
+
+        
+        generate_year_temp_art(
+            location_address=address,
+            start_date=start_date,
+            success_callback=status_success_callback,
+            progress_callback=status_progress_callback,
+            error_callback=status_error_callback
+        )
+            
+

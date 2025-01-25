@@ -1,15 +1,25 @@
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel 
 from geopy.geocoders import Nominatim
 
-class LocationPoint(BaseModel):
+class Coordinates(BaseModel):
     latitude: float
     longitude: float
 
+class GeoLocationError(Exception):
+    def __init__(self, message: str):
+        super().__init__(message)
 
-def address_to_coordinates(address: str) -> LocationPoint:
-    geolocator = Nominatim(user_agent="geoart")
-    location = geolocator.geocode(address)
-    if location is None:
-        raise ValueError(f"Could not find location for address: {address}")
-    
-    return LocationPoint(latitude=location.latitude, longitude=location.longitude)
+class AddressNotFoundError(GeoLocationError):
+    def __init__(self, message: str):
+        super().__init__(message)
+
+
+def address_to_coordinates(address: str) -> Coordinates:
+    try:
+        geolocator = Nominatim(user_agent="geoart")
+        location = geolocator.geocode(address)
+        if location is None:
+            raise AddressNotFoundError(f"Could not find coordinates for address: {address}")
+        return Coordinates(latitude=location.latitude, longitude=location.longitude)
+    except Exception as e:
+        raise GeoLocationError(f"An error occurred while geocoding the address: {e}")

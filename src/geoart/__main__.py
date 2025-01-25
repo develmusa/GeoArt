@@ -143,9 +143,7 @@ def original(hourly_dataframe: pd.DataFrame) -> np.ndarray[Any]:
         flattened_data = flattened_data[:total_pixels]
 
     # Reshape and convert to a NumPy array of the correct type
-    returnclass LocationPoint(BaseModel):
-    latitude: float
-    longitude: float
+
 
 
 def address_to_goordinates(address: str) -> LocationPoint:

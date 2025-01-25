@@ -4,12 +4,12 @@ import pytest
 from unittest.mock import patch
 from geopy.exc import GeocoderServiceError
 
-from geoart.geolocation import LocationPoint, address_to_coordinates
+from geoart.geolocation import Coordinates, address_to_coordinates
 
 
 def test_address_to_coordinates_valid():
     address = "1600 Amphitheatre Parkway, Mountain View, CA"
-    expected_location = LocationPoint(latitude=37.4221, longitude=-122.0841)
+    expected_location = Coordinates(latitude=37.4221, longitude=-122.0841)
     
     with patch('geopy.geocoders.Nominatim.geocode') as mock_geocode:
         mock_geocode.return_value.latitude = expected_location.latitude
@@ -35,7 +35,7 @@ def test_address_to_coordinates_service_error():
 def test_address_to_coordinates_service_geocoder_coordinates_valid():
 
     address = "Ghazipur landfill"
-    expected_location = LocationPoint(latitude=28.62, longitude=77.32)
+    expected_location = Coordinates(latitude=28.62, longitude=77.32)
 
     location = address_to_coordinates(address)
     dump = location.model_dump()
