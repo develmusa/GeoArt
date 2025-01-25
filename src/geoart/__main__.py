@@ -1,3 +1,4 @@
+from geopy.geocoders import Nominatim
 import numpy as np
 from PIL import Image
 import httpx
@@ -142,9 +143,18 @@ def original(hourly_dataframe: pd.DataFrame) -> np.ndarray[Any]:
         flattened_data = flattened_data[:total_pixels]
 
     # Reshape and convert to a NumPy array of the correct type
-    return flattened_data.reshape((desired_height, desired_width)).astype(np.uint8)
+    returnclass LocationPoint(BaseModel):
+    latitude: float
+    longitude: float
 
 
+def address_to_goordinates(address: str) -> LocationPoint:
+    geolocator = Nominatim(user_agent="geoart")
+    location = geolocator.geocode(address)
+    if location is None:
+        raise ValueError(f"Could not find location for address: {address}")
+    
+    return LocationPoint(latitude=location.latitude, longitude=location.longitude)
 if __name__ == "__main__":
     import asyncio
 

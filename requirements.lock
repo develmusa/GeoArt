@@ -31,6 +31,10 @@ charset-normalizer==3.4.1
     # via requests
 click==8.1.8
     # via streamlit
+geographiclib==2.0
+    # via geopy
+geopy==2.4.1
+    # via geoart
 gitdb==4.0.12
     # via gitpython
 gitpython==3.1.44
