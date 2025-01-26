@@ -84,14 +84,16 @@ def create_image(df: pd.DataFrame) -> Image:
 
     days = df["time"].dt.date.unique().size
 
-    image_width = 1200
-    image_height = days
+    day_scaling_factor = 3
 
-    total_required_pixels = image_width * image_height
+    image_height = days * day_scaling_factor
+    image_width = image_height 
+
+    total_required_temperature_values = image_width * days
 
     df['time'] = pd.to_datetime(df['time'])
 
-    new_time_range = pd.date_range(start=df['time'].iloc[0], end=df['time'].iloc[-1], periods=total_required_pixels)
+    new_time_range = pd.date_range(start=df['time'].iloc[0], end=df['time'].iloc[-1], periods=total_required_temperature_values)
 
     df_interpolated = pd.DataFrame({'time': new_time_range})
     df_interpolated['temperature'] = np.interp(
@@ -99,7 +101,13 @@ def create_image(df: pd.DataFrame) -> Image:
         df['time'].astype(np.int64), 
         df['temperature']
     )
-
-    flattened_data = df_interpolated['temperature'].fillna(0).to_numpy().flatten().astype(np.int64)
+    # Reshape the array to match 'days' for repeating
+    reshaped_data = df_interpolated['temperature'].fillna(0).to_numpy().reshape((days, image_width))
+    
+    # Repeat each day's data 3 times
+    repeated_data = np.repeat(reshaped_data, 3, axis=0)
+    
+    # Flatten the repeated data
+    flattened_data = repeated_data.flatten().astype(np.int64)
     image = Image(image_array=flattened_data, width=image_width, height=image_height)
     return image    
