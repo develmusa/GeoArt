@@ -1,3 +1,4 @@
+import pandas as pd
 from pydantic import BaseModel 
 from typing import List
 from datetime import datetime
@@ -7,6 +8,14 @@ import geoart.geolocation as geolocation
 class HourlyData(BaseModel):
     time: List[datetime]
     temperature_2m: List[float]
+
+    def to_dataframe(self) -> pd.DataFrame:
+        return pd.DataFrame({
+            'time': self.time,
+            'temperatur': self.temperature_2m
+        })
+    
+    
 
 class WeatherData(BaseModel):
     latitude: float

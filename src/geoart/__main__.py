@@ -7,44 +7,6 @@ from pydantic import BaseModel, ValidationError
 from typing import Any, List
 from datetime import datetime
 
-class HourlyData(BaseModel):
-    time: List[datetime]
-    temperature_2m: List[float]
-
-class WeatherResponse(BaseModel):
-    latitude: float
-    longitude: float
-    elevation: float
-    timezone: str
-    timezone_abbreviation: str
-    utc_offset_seconds: int
-    hourly: HourlyData
-
-# Function to fetch weather data
-async def fetch_weather_data():
-    url = "https://archive-api.open-meteo.com/v1/archive"
-    params = {
-        "latitude": 47.3667,
-        "longitude": 8.55,
-        "start_date": "2023-12-31",
-        "end_date": "2025-01-14",
-        "hourly": "temperature_2m",
-    }
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, params=params)
-        response.raise_for_status()  # Raise for HTTP errors
-        try:
-            data = response.json()
-            # Parse and validate the response using Pydantic
-            weather_data = WeatherResponse(**data)
-            return weather_data
-        except ValidationError as e:
-            print("Validation Error:", e)
-            raise
-        except Exception as e:
-            print("Unexpected Error:", e)
-            raise
-
 
 from scipy.interpolate import make_splrep, splev
 
@@ -146,13 +108,6 @@ def original(hourly_dataframe: pd.DataFrame) -> np.ndarray[Any]:
 
 
 
-def address_to_goordinates(address: str) -> LocationPoint:
-    geolocator = Nominatim(user_agent="geoart")
-    location = geolocator.geocode(address)
-    if location is None:
-        raise ValueError(f"Could not find location for address: {address}")
-    
-    return LocationPoint(latitude=location.latitude, longitude=location.longitude)
 if __name__ == "__main__":
     import asyncio
 

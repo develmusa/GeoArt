@@ -14,6 +14,7 @@ class ProcessData(BaseModel):
     weather_data: Optional[WeatherData] = None
     start_date: datetime.date
     end_date: Optional[datetime.date] = None
+    
 
 class Notifier:
     def __init__(self, success_callback: Callable[[str, ProcessData], None], progress_callback: Optional[Callable[[str], None]] = None, error_callback: Optional[Callable[[str], None]] = None):
@@ -56,8 +57,6 @@ def generate_year_temp_art(
             notifier.notify_progress("Fetching weather data...")
             process_data.weather_data = await weather_data.fetch_weather_data(location_point=process_data.location_coordinates, start_date=process_data.start_date, end_date=process_data.end_date)
             notifier.notify_success("Creating Art Complete", process_data)
-
-          
 
         except geolocation.AddressNotFoundError:
             notifier.notify_error("Address not found")
