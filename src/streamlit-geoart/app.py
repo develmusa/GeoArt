@@ -12,8 +12,9 @@ st.set_page_config(
 st.title('GeoArt')
 
 st.write("""
-    # One Year Temperatures
-    GeoArt is a tool for creating and sharing geospatial art.
+    # One Year Temperature
+    This app generates a temperature map for a given location of a year.
+    The map is generated using the OpenWeatherMap API.
     """)
 
 if not st.session_state:

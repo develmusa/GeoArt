@@ -132,7 +132,7 @@ def create_image(df: pd.DataFrame) -> Image:
     # Repeat each day's data 3 times
     repeated_data = np.repeat(reshaped_data, day_scaling_factor, axis=0)
     normalized_data = (repeated_data - repeated_data.min()) / (repeated_data.max() - repeated_data.min())
-    color_map = mpl.colormaps["viridis"](normalized_data) * 255
+    color_map = mpl.colormaps["inferno"](normalized_data) * 255
     color_map = color_map.flatten().astype(np.uint8)
     # Flatten the repeated data
     image = Image(image_array=color_map, width=image_width, height=image_height)
