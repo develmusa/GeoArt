@@ -81,11 +81,31 @@ def generate_year_temp_art(
 
 
 def create_image(df: pd.DataFrame) -> Image:
-    df["date"] = df["time"].dt.date
-    df["time"] = df["time"].dt.time
 
-    df = df.pivot(index="date", columns="time", values="temperature")
+    days = df["time"].dt.date.unique().size
 
-    flattened_data = df.fillna(0).to_numpy().flatten()
-    image = Image(image_array=flattened_data, width=df.shape[1], height=df.shape[0])
+    image_width = 24
+    image_height = days
+
+    total_required_pixels = image_width * image_height
+
+    df['time'] = pd.to_datetime(df['time'])
+
+    new_time_range = pd.date_range(start=df['time'].iloc[0], end=df['time'].iloc[-1], periods=total_required_pixels)
+
+    df_interpolated = pd.DataFrame({'time': new_time_range})
+    df_interpolated['temperature'] = np.interp(
+    df_interpolated['time'].astype(np.int64), 
+        df['time'].astype(np.int64), 
+        df['temperature']
+    )
+
+    df_interpolated["date"] = df_interpolated["time"].dt.date
+    df_interpolated["time"] = df_interpolated["time"].dt.time
+
+    df_interpolated = df_interpolated.pivot(index="date", columns="time", values="temperature")
+
+
+    flattened_data = df_interpolated.fillna(0).to_numpy().flatten().astype(np.int64)
+    image = Image(image_array=flattened_data, width=image_width, height=image_height)
     return image    
