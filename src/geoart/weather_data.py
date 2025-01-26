@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import List
 from datetime import datetime
 import httpx
+from geoart.data_utils import normalize_dataframe_to_bytes
 import geoart.geolocation as geolocation
 
 class HourlyData(BaseModel):
@@ -12,8 +13,14 @@ class HourlyData(BaseModel):
     def to_dataframe(self) -> pd.DataFrame:
         return pd.DataFrame({
             'time': self.time,
-            'temperatur': self.temperature_2m
+            'temperature': self.temperature_2m
         })
+    
+    def to_dataframe_byte_normalized(self) -> pd.DataFrame:
+        df = self.to_dataframe()
+        temperatur_df = df[['temperature']]
+        df["temperature"] = normalize_dataframe_to_bytes(temperatur_df)
+        return df
     
 
 # df = df.set_index("timestamp")

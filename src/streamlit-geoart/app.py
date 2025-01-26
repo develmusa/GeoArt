@@ -53,6 +53,7 @@ if form_submit:
     # st.write(st.session_state.process_data)
     # coordinates = st.session_state.process_data.coordinates
     # process_data: ProcessData = st.session_state.process_data
+    data: ProcessData = st.session_state.process_data
     map_data = pd.DataFrame([st.session_state.process_data.location_coordinates.model_dump()])
 
 
@@ -71,3 +72,4 @@ if form_submit:
     with col3:
         st.markdown("##### Mean Temperature") 
         st.metric(label="Mean", label_visibility="hidden", value= f"{process_data.weather_data.hourly.to_dataframe().mean().values[1].round()} °C")
+    st.image(process_data.image.get_image())

@@ -6,8 +6,10 @@ from typing import Callable, Optional, Any
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, field_validator
+from geoart.data_utils import normalize_dataframe_to_bytes
 import geoart.geolocation as geolocation
 from geoart.geolocation import Coordinates
+from geoart.image import Image
 import geoart.weather_data as weather_data
 from geoart.weather_data import WeatherData
 
@@ -17,6 +19,7 @@ class ProcessData(BaseModel):
     weather_data: Optional[WeatherData] = None
     start_date: datetime.date
     end_date: Optional[datetime.date] = None
+    image: Optional[Image] = None
     # image: Optional[np.ndarray] = None  # To hold serialized NumPy array    image_array: Optional[np.ndarray] = None
 
 class Notifier:
@@ -59,6 +62,8 @@ def generate_year_temp_art(
             process_data.location_coordinates = geolocation.address_to_coordinates(address=location_address)
             notifier.notify_progress("Fetching weather data...")
             process_data.weather_data = await weather_data.fetch_weather_data(location_point=process_data.location_coordinates, start_date=process_data.start_date, end_date=process_data.end_date)
+            process_data.image = create_image(process_data.weather_data.hourly.to_dataframe_byte_normalized())
+            
             notifier.notify_success("Creating Art Complete", process_data)
 
 
@@ -71,9 +76,16 @@ def generate_year_temp_art(
             notifier.notify_error("Error fetching weather data")
 
         except Exception as e:
-            notifier.notify_error("Unexpected Error")
+            notifier.notify_error(f"Unexpected Error {e}")
     asyncio.run(async_wrapper())
 
 
+def create_image(df: pd.DataFrame) -> Image:
+    df["date"] = df["time"].dt.date
+    df["time"] = df["time"].dt.time
 
+    df = df.pivot(index="date", columns="time", values="temperature")
 
+    flattened_data = df.fillna(0).to_numpy().flatten()
+    image = Image(image_array=flattened_data, width=df.shape[1], height=df.shape[0])
+    return image    
