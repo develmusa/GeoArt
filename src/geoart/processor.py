@@ -84,7 +84,7 @@ def create_image(df: pd.DataFrame) -> Image:
 
     days = df["time"].dt.date.unique().size
 
-    image_width = 24
+    image_width = 1200
     image_height = days
 
     total_required_pixels = image_width * image_height
@@ -100,12 +100,6 @@ def create_image(df: pd.DataFrame) -> Image:
         df['temperature']
     )
 
-    df_interpolated["date"] = df_interpolated["time"].dt.date
-    df_interpolated["time"] = df_interpolated["time"].dt.time
-
-    df_interpolated = df_interpolated.pivot(index="date", columns="time", values="temperature")
-
-
-    flattened_data = df_interpolated.fillna(0).to_numpy().flatten().astype(np.int64)
+    flattened_data = df_interpolated['temperature'].fillna(0).to_numpy().flatten().astype(np.int64)
     image = Image(image_array=flattened_data, width=image_width, height=image_height)
     return image    
