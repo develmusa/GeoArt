@@ -63,14 +63,28 @@ if form_submit:
     st.image(process_data.image.get_image())
     print(process_data.model_dump_json)
     col1, col2, col3 = st.columns(3)
+        # Convert hourly weather data to a DataFrame
+    df = process_data.weather_data.hourly.to_dataframe()
+
+    # Find indices of maximum and minimum temperatures
+    max_temp_index = df['temperature'].idxmax()
+    min_temp_index = df['temperature'].idxmin()
 
     with col1:
-        st.markdown("##### Max. Temperature") 
-        st.metric(label=f"{process_data.weather_data.hourly.to_dataframe().max().values[0]}", value= f"{process_data.weather_data.hourly.to_dataframe().max().values[1]} °C", border=False)
+        st.markdown("##### Max. Temperature")
+        max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+        max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
+        st.metric(label=max_time_str, value=max_temp_str, border=False)
+
     with col2:
-        st.markdown("##### Min. Temperature") 
-        st.metric(label=f"{process_data.weather_data.hourly.to_dataframe().min().values[0]}", value= f"{process_data.weather_data.hourly.to_dataframe().min().values[1]} °C")
+        st.markdown("##### Min. Temperature")
+        min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+        min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
+        st.metric(label=min_time_str, value=min_temp_str)
+
     with col3:
-        st.markdown("##### Mean Temperature") 
-        st.metric(label="Mean", label_visibility="hidden", value= f"{process_data.weather_data.hourly.to_dataframe().mean().values[1].round()} °C")
+        st.markdown("##### Mean Temperature")
+        mean_temp_str = f"{df['temperature'].mean().round()} °C"
+        st.metric(label="Mean", label_visibility="hidden", value=mean_temp_str)
+
     st.map(data=map_data, zoom=10, use_container_width=True)
