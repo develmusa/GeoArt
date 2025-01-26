@@ -58,8 +58,8 @@ if form_submit:
 
 
             
-    st.map(data=map_data, zoom=10, use_container_width=True)
     process_data: ProcessData = st.session_state.process_data
+    st.image(process_data.image.get_image())
     print(process_data.model_dump_json)
     col1, col2, col3 = st.columns(3)
 
@@ -72,4 +72,4 @@ if form_submit:
     with col3:
         st.markdown("##### Mean Temperature") 
         st.metric(label="Mean", label_visibility="hidden", value= f"{process_data.weather_data.hourly.to_dataframe().mean().values[1].round()} °C")
-    st.image(process_data.image.get_image())
+    st.map(data=map_data, zoom=10, use_container_width=True)

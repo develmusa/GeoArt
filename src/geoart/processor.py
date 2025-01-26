@@ -84,7 +84,7 @@ def create_image(df: pd.DataFrame) -> Image:
 
     days = df["time"].dt.date.unique().size
 
-    day_scaling_factor = 3
+    day_scaling_factor = 10
 
     image_height = days * day_scaling_factor
     image_width = image_height 
@@ -105,7 +105,7 @@ def create_image(df: pd.DataFrame) -> Image:
     reshaped_data = df_interpolated['temperature'].fillna(0).to_numpy().reshape((days, image_width))
     
     # Repeat each day's data 3 times
-    repeated_data = np.repeat(reshaped_data, 3, axis=0)
+    repeated_data = np.repeat(reshaped_data, day_scaling_factor, axis=0)
     
     # Flatten the repeated data
     flattened_data = repeated_data.flatten().astype(np.int64)
