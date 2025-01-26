@@ -1,8 +1,11 @@
 import asyncio
+import base64
 import datetime
 from typing import Callable, Optional, Any
 
-from pydantic import BaseModel
+import numpy as np
+import pandas as pd
+from pydantic import BaseModel, field_validator
 import geoart.geolocation as geolocation
 from geoart.geolocation import Coordinates
 import geoart.weather_data as weather_data
@@ -14,7 +17,7 @@ class ProcessData(BaseModel):
     weather_data: Optional[WeatherData] = None
     start_date: datetime.date
     end_date: Optional[datetime.date] = None
-    
+    # image: Optional[np.ndarray] = None  # To hold serialized NumPy array    image_array: Optional[np.ndarray] = None
 
 class Notifier:
     def __init__(self, success_callback: Callable[[str, ProcessData], None], progress_callback: Optional[Callable[[str], None]] = None, error_callback: Optional[Callable[[str], None]] = None):
@@ -58,6 +61,9 @@ def generate_year_temp_art(
             process_data.weather_data = await weather_data.fetch_weather_data(location_point=process_data.location_coordinates, start_date=process_data.start_date, end_date=process_data.end_date)
             notifier.notify_success("Creating Art Complete", process_data)
 
+
+            
+
         except geolocation.AddressNotFoundError:
             notifier.notify_error("Address not found")
 
@@ -67,3 +73,7 @@ def generate_year_temp_art(
         except Exception as e:
             notifier.notify_error("Unexpected Error")
     asyncio.run(async_wrapper())
+
+
+
+

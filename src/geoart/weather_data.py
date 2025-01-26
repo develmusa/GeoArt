@@ -15,7 +15,16 @@ class HourlyData(BaseModel):
             'temperatur': self.temperature_2m
         })
     
+
+# df = df.set_index("timestamp")
+# df_minute = df.resample("T").interpolate()
+# print(df_minute)
+
+# df = df.set_index("timestamp")
+# df_minute = df.resample("T").ffill()  # Forward fill hourly values
+# print(df_minute)
     
+
 
 class WeatherData(BaseModel):
     latitude: float

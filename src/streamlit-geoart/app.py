@@ -55,9 +55,11 @@ if form_submit:
     # process_data: ProcessData = st.session_state.process_data
     map_data = pd.DataFrame([st.session_state.process_data.location_coordinates.model_dump()])
 
-    st.map(data=map_data, zoom=10, use_container_width=True)
 
+            
+    st.map(data=map_data, zoom=10, use_container_width=True)
     process_data: ProcessData = st.session_state.process_data
+    print(process_data.model_dump_json)
     col1, col2, col3 = st.columns(3)
 
     with col1:
@@ -69,12 +71,3 @@ if form_submit:
     with col3:
         st.markdown("##### Mean Temperature") 
         st.metric(label="Mean", label_visibility="hidden", value= f"{process_data.weather_data.hourly.to_dataframe().mean().values[1].round()} °C")
-
-            
-    with st.expander("See explanation"):
-        st.write('''
-            The chart above shows some numbers I picked for you.
-            I rolled actual dice for these, so they're *guaranteed* to
-            be random.
-        ''')
-        st.image("https://static.streamlit.io/examples/dice.jpg")
