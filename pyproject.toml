@@ -17,6 +17,7 @@ dependencies = [
     "streamlit-plotly-mapbox-events>=0.1.2",
     "streamlit-keplergl>=0.3.0",
     "scikit-learn>=1.6.1",
+    "matplotlib>=3.10.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.8"

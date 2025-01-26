@@ -12,6 +12,8 @@ from geoart.geolocation import Coordinates
 from geoart.image import Image
 import geoart.weather_data as weather_data
 from geoart.weather_data import WeatherData
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 class ProcessData(BaseModel):
     location_address: str
@@ -62,7 +64,8 @@ def generate_year_temp_art(
             process_data.location_coordinates = geolocation.address_to_coordinates(address=location_address)
             notifier.notify_progress("Fetching weather data...")
             process_data.weather_data = await weather_data.fetch_weather_data(location_point=process_data.location_coordinates, start_date=process_data.start_date, end_date=process_data.end_date)
-            process_data.image = create_image(process_data.weather_data.hourly.to_dataframe_byte_normalized())
+            # process_data.image = create_image(process_data.weather_data.hourly.to_dataframe_byte_normalized())
+            process_data.image = create_image(process_data.weather_data.hourly.to_dataframe())
             
             notifier.notify_success("Creating Art Complete", process_data)
 
@@ -78,6 +81,25 @@ def generate_year_temp_art(
         except Exception as e:
             notifier.notify_error(f"Unexpected Error {e}")
     asyncio.run(async_wrapper())
+
+def create_image1(df: pd.DataFrame) -> Image:
+    df = df[["temperature"]]
+
+    normalized_data = (df - df.min().min()) / (df.max().max() - df.min().min())
+
+    color_map = mpl.colormaps["viridis"](normalized_data.values)
+
+    image_data = (color_map[:, :, :3] * 255).astype(np.uint8)
+    plt.imshow(image_data)
+    plt.axis('off')  # Hide the axis
+    plt.show()
+    
+
+    
+
+
+
+    return create_image(df.to_dataframe_byte_normalized())
 
 
 def create_image(df: pd.DataFrame) -> Image:
@@ -101,13 +123,17 @@ def create_image(df: pd.DataFrame) -> Image:
         df['time'].astype(np.int64), 
         df['temperature']
     )
+
+
+
     # Reshape the array to match 'days' for repeating
     reshaped_data = df_interpolated['temperature'].fillna(0).to_numpy().reshape((days, image_width))
     
     # Repeat each day's data 3 times
     repeated_data = np.repeat(reshaped_data, day_scaling_factor, axis=0)
-    
+    normalized_data = (repeated_data - repeated_data.min()) / (repeated_data.max() - repeated_data.min())
+    color_map = mpl.colormaps["viridis"](normalized_data) * 255
+    color_map = color_map.flatten().astype(np.uint8)
     # Flatten the repeated data
-    flattened_data = repeated_data.flatten().astype(np.int64)
-    image = Image(image_array=flattened_data, width=image_width, height=image_height)
+    image = Image(image_array=color_map, width=image_width, height=image_height)
     return image    

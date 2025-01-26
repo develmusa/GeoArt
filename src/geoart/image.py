@@ -12,7 +12,7 @@ class Image(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
-    def get_image(self, channels: int = 1) -> np.ndarray:
+    def get_image(self, channels: int = 4) -> np.ndarray:
         """
         Reshape the image array using stored width, height, and optional channels.
         """
