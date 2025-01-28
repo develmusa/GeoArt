@@ -55,6 +55,7 @@ async def fetch_weather_data(location_point: geolocation.Coordinates, start_date
         "start_date": start_date,
         "end_date": end_date,
         "hourly": "temperature_2m",
+        "timezone": "auto"
     }
     async with httpx.AsyncClient() as client:
         try:
