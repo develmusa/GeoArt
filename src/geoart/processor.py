@@ -57,6 +57,7 @@ def generate_year_temp_art(
     notifier = Notifier(success_callback=success_callback, progress_callback=progress_callback, error_callback=error_callback)
     process_data = ProcessData(location_address=location_address, start_date=start_date)
     process_data.end_date = start_date.replace(year=start_date.year + 1)
+    # process_data.end_date = start_date.replace(year=start_date.year + 1).date()
 
     async def async_wrapper():
 
