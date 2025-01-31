@@ -25,7 +25,7 @@ if not st.session_state:
 
 form = st.form(key="form_settings")
 address = form.text_input(label="Location", key="location")
-start_date = form.date_input("Start Date", datetime.date(2024, 1, 1), min_value=datetime.date(1940, 1, 1))
+start_date = form.date_input("Start Date", datetime.date(2024, 1, 1), min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366))
 form_submit = form.form_submit_button(label="Submit")
 
 if form_submit:
