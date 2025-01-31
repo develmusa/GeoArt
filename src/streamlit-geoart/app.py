@@ -3,6 +3,7 @@ import streamlit as st
 
 import datetime
 from geoart.processor import generate_year_temp_art, ProcessData
+import matplotlib as mpl
 
 
 st.set_page_config(
@@ -19,6 +20,7 @@ st.write("""
 
 if not st.session_state:
     st.session_state.process_data = None
+
 
 
 
@@ -45,6 +47,7 @@ if form_submit:
         
         generate_year_temp_art(
             location_address=address,
+            color_map="magma",
             start_date=start_date,
             success_callback=status_success_callback,
             progress_callback=status_progress_callback,
@@ -60,8 +63,14 @@ if form_submit:
 
             
     process_data: ProcessData = st.session_state.process_data
+
+    option = st.selectbox(
+        "Select a colormap?",
+        mpl.colormaps,
+    )
+
     st.image(process_data.image.get_image())
-    print(process_data.model_dump_json)
+    # print(process_data.model_dump_json)
     col1, col2, col3 = st.columns(3)
         # Convert hourly weather data to a DataFrame
     df = process_data.weather_data.hourly.to_dataframe()
