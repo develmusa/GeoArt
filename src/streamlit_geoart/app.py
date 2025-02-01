@@ -4,9 +4,8 @@ import pandas as pd
 import streamlit as st
 import datetime
 import pendulum
-from geoart.processor import generate_year_temp_art, ProcessData
 import matplotlib as mpl
-
+from streamlit_geoart.processor import ProcessData, generate_year_temp_art
 from pydantic import BaseModel
 
 class session_state_user_data(BaseModel):

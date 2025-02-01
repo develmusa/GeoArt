@@ -18,7 +18,7 @@
             "module": "streamlit",
             "args": [
                 "run",
-                "src/streamlit-geoart/app.py"
+                "src/streamlit_geoart/app.py"
             ]
 
         }
