@@ -1,10 +1,48 @@
+import asyncio
 import streamlit as st
 import datetime
 import matplotlib as mpl
-from streamlit_geoart.processor import ProcessData, generate_year_temp_art 
+from geoart import geolocation
+from geoart import weather_data
+from geoart.image import Image, create_image
+from geoart.weather_data import WeatherData
 from pydantic import BaseModel
 
+@st.cache_data
+def get_location_coordinates(location_str: str) -> geolocation.Coordinates:
+    try:
+        return geolocation.address_to_coordinates(address=location_str)
+    except geolocation.AddressNotFoundError:
+        st.error(f"Could not find coordinates for address: {location_str}")
+        st.stop()
+    except Exception as e:
+        #Todo: Add logging and error tracking do not expose internal errors to the user
+        st.error("An unkown error occurred while fetching location coordinates")
+        st.stop()
+        
 
+@st.cache_data(hash_funcs={geolocation.Coordinates: lambda c: (c.latitude, c.longitude)})
+def get_weather_data(location: geolocation.Coordinates, start_date: datetime.date, end_date: datetime.date) -> WeatherData:
+    try:
+        async def async_wrapper() -> WeatherData:
+            return await weather_data.fetch_weather_data(location_point=location, start_date=start_date, end_date=end_date)
+        return asyncio.run(async_wrapper())
+    except weather_data.WeatherDataError:
+        st.error(f"Could not fetch weather data for {location}, {start_date} to {end_date}")
+        st.stop()
+    except Exception as e:
+        #Todo: Add logging and error tracking do not expose internal errors to the user
+        st.error("An unkown error occurred while fetching weather data")
+        st.stop()
+
+@st.cache_data(hash_funcs={WeatherData: lambda w: (w.latitude, w.longitude, hash(tuple(w.hourly.temperature_2m)))})
+def get_image(weather_data: WeatherData, color_map: str) -> Image:
+    try:
+        return create_image(weather_data.hourly.to_dataframe(), color_map)
+    except Exception as e:  
+        #Todo: Add logging and error tracking do not expose internal errors to the user
+        st.error("An unkown error occurred while generating image")
+        st.stop()
 
 
 st.set_page_config(
@@ -20,7 +58,6 @@ st.write("""
     """)
 
 class session_state_user_data(BaseModel):
-    process_data: ProcessData = None
     location: str = "Kopenhagen"
     start_date: datetime.date = datetime.date(2023, 1, 1) 
     style: str = "berlin"
@@ -31,32 +68,28 @@ if not st.session_state:
 form_col1, form_col2= st.columns(2)
 address = form_col1.text_input(label="Location", key="location")
 start_date = form_col2.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
+st.session_state.end_date = start_date.replace(year=start_date.year + 1)
 
-def generate_data():
-    data = generate_year_temp_art(
-        location_address=st.session_state.location,
-        color_map=st.session_state.style,
-        start_date=st.session_state.start_date,
-    )
-    st.session_state.process_data = data
+st.session_state.location_coordinates = get_location_coordinates(address)
+st.session_state.weather_data = get_weather_data(st.session_state.location_coordinates, st.session_state.start_date, st.session_state.end_date)
 
-generate_data()
+def get_image_wrapper():
+    st.session_state.image = get_image(st.session_state.weather_data, st.session_state.style)
 
-        
-process_data: ProcessData = st.session_state.process_data
+get_image_wrapper()
 
 option = st.selectbox(
     "Select a colormap?",
     mpl.colormaps,
     key="style",
-    on_change=generate_data,
+    on_change=get_image_wrapper,
 )
 
-st.image(process_data.image.get_image())
+st.image(st.session_state.image.get_image(), caption="Temperature Map")
 
 col1, col2, col3 = st.columns(3)
     # Convert hourly weather data to a DataFrame
-df = process_data.weather_data.hourly.to_dataframe()
+df = st.session_state.weather_data.hourly.to_dataframe()
 
 # Find indices of maximum and minimum temperatures
 max_temp_index = df['temperature'].idxmax()
