@@ -1,4 +1,5 @@
 import asyncio
+import time
 import streamlit as st
 import datetime
 import matplotlib as mpl
@@ -13,7 +14,7 @@ class SessionStateManager(BaseModel):
     # User input fields
     location: str = Field(default="Kopenhagen")
     start_date: datetime.date = Field(default=datetime.date(2023, 1, 1))
-    style: str = Field(default="berlin")
+    style: str = Field(default="afmhot")
     
     # Computed fields
     end_date: datetime.date | None = Field(default=None)
