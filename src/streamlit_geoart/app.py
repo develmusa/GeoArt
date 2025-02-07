@@ -9,7 +9,7 @@ from geoart.weather_data import WeatherData
 from pydantic import BaseModel, Field
 from typing import Any
 
-class SessionStateWrapper(BaseModel):
+class SessionStateManager(BaseModel):
     # User input fields
     location: str = Field(default="Kopenhagen")
     start_date: datetime.date = Field(default=datetime.date(2023, 1, 1))
@@ -28,7 +28,7 @@ class SessionStateWrapper(BaseModel):
             setattr(st.session_state, name, value)
 
     @classmethod
-    def from_session_state(cls) -> 'SessionStateWrapper':
+    def from_session_state(cls) -> 'SessionStateManager':
         """Create a SessionState instance from current st.session_state and ensure defaults are set"""
         instance = cls(**{
             field: getattr(st.session_state, field, default.default)
@@ -93,7 +93,7 @@ st.write("""
     The map is generated using the OpenWeatherMap API.
     """)
 # Initialize or get existing session state
-session = SessionStateWrapper.from_session_state()
+session = SessionStateManager.from_session_state()
 
 form_col1, form_col2= st.columns(2)
 address = form_col1.text_input(label="Location", key="location")
