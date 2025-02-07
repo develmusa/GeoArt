@@ -1,21 +1,16 @@
 import asyncio
-import base64
 import datetime
-from typing import Callable, Optional, Any
-
-import numpy as np
-import pandas as pd
-from pydantic import BaseModel, field_validator
-from geoart.data_utils import normalize_dataframe_to_bytes
-import geoart.geolocation as geolocation
-from geoart.geolocation import Coordinates
-from geoart.image import Image, create_image
-import geoart.weather_data as weather_data
-from geoart.weather_data import WeatherData
-import matplotlib.pyplot as plt
-import matplotlib as mpl
+from typing import Optional
 
 import streamlit as st
+from pydantic import BaseModel 
+
+import geoart.geolocation as geolocation
+import geoart.weather_data as weather_data
+from geoart.geolocation import Coordinates
+from geoart.image import Image, create_image
+from geoart.weather_data import WeatherData
+
 
 class ProcessData(BaseModel):
     location_address: str

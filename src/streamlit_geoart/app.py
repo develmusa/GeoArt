@@ -1,19 +1,10 @@
-import json
-import time
-import pandas as pd
 import streamlit as st
 import datetime
-import pendulum
 import matplotlib as mpl
 from streamlit_geoart.processor import ProcessData, generate_year_temp_art 
 from pydantic import BaseModel
 
 
-class session_state_user_data(BaseModel):
-    process_data: ProcessData = None
-    location: str = "Kopenhagen"
-    start_date: datetime.date = datetime.date(2023, 1, 1) 
-    style: str = "berlin"
 
 
 st.set_page_config(
@@ -28,6 +19,11 @@ st.write("""
     The map is generated using the OpenWeatherMap API.
     """)
 
+class session_state_user_data(BaseModel):
+    process_data: ProcessData = None
+    location: str = "Kopenhagen"
+    start_date: datetime.date = datetime.date(2023, 1, 1) 
+    style: str = "berlin"
 if not st.session_state:
     st.session_state.update(session_state_user_data())
 
@@ -36,17 +32,14 @@ form_col1, form_col2= st.columns(2)
 address = form_col1.text_input(label="Location", key="location")
 start_date = form_col2.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
 
-progress = st.empty()
-
-
 def generate_data():
-    ...
     data = generate_year_temp_art(
         location_address=st.session_state.location,
         color_map=st.session_state.style,
         start_date=st.session_state.start_date,
     )
     st.session_state.process_data = data
+
 generate_data()
 
         
@@ -58,7 +51,6 @@ option = st.selectbox(
     key="style",
     on_change=generate_data,
 )
-
 
 st.image(process_data.image.get_image())
 
