@@ -6,7 +6,43 @@ from geoart import geolocation
 from geoart import weather_data
 from geoart.image import Image, create_image
 from geoart.weather_data import WeatherData
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Any
+
+class SessionStateWrapper(BaseModel):
+    # User input fields
+    location: str = Field(default="Kopenhagen")
+    start_date: datetime.date = Field(default=datetime.date(2023, 1, 1))
+    style: str = Field(default="berlin")
+    
+    # Computed fields
+    end_date: datetime.date | None = Field(default=None)
+    location_coordinates: geolocation.Coordinates | None = Field(default=None)
+    weather_data: WeatherData | None = Field(default=None)
+    image: Image | None = Field(default=None)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Override setattr to sync with st.session_state"""
+        super().__setattr__(name, value)
+        if hasattr(st, 'session_state'):  # Check if we're in a Streamlit context
+            setattr(st.session_state, name, value)
+
+    @classmethod
+    def from_session_state(cls) -> 'SessionStateWrapper':
+        """Create a SessionState instance from current st.session_state and ensure defaults are set"""
+        instance = cls(**{
+            field: getattr(st.session_state, field, default.default)
+            for field, default in cls.model_fields.items()
+        })
+        
+        # Ensure st.session_state contains all fields with their values
+        for field, value in instance.model_dump().items():
+            if not hasattr(st.session_state, field):
+                setattr(st.session_state, field, value)
+        
+        return instance
+
+    
 
 @st.cache_data
 def get_location_coordinates(location_str: str) -> geolocation.Coordinates:
@@ -56,25 +92,20 @@ st.write("""
     This app generates a temperature map for a given location of a year.
     The map is generated using the OpenWeatherMap API.
     """)
-
-class session_state_user_data(BaseModel):
-    location: str = "Kopenhagen"
-    start_date: datetime.date = datetime.date(2023, 1, 1) 
-    style: str = "berlin"
-if not st.session_state:
-    st.session_state.update(session_state_user_data())
-
+# Initialize or get existing session state
+session = SessionStateWrapper.from_session_state()
 
 form_col1, form_col2= st.columns(2)
 address = form_col1.text_input(label="Location", key="location")
 start_date = form_col2.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
-st.session_state.end_date = start_date.replace(year=start_date.year + 1)
 
-st.session_state.location_coordinates = get_location_coordinates(address)
-st.session_state.weather_data = get_weather_data(st.session_state.location_coordinates, st.session_state.start_date, st.session_state.end_date)
+# Update computed fields
+session.end_date = start_date.replace(year=start_date.year + 1)
+session.location_coordinates = get_location_coordinates(address)
+session.weather_data = get_weather_data(session.location_coordinates, session.start_date, session.end_date)
 
 def get_image_wrapper():
-    st.session_state.image = get_image(st.session_state.weather_data, st.session_state.style)
+    session.image = get_image(session.weather_data, session.style)
 
 get_image_wrapper()
 
@@ -85,11 +116,11 @@ option = st.selectbox(
     on_change=get_image_wrapper,
 )
 
-st.image(st.session_state.image.get_image(), caption="Temperature Map")
+st.image(session.image.get_image())
 
 col1, col2, col3 = st.columns(3)
-    # Convert hourly weather data to a DataFrame
-df = st.session_state.weather_data.hourly.to_dataframe()
+# Convert hourly weather data to a DataFrame
+df = session.weather_data.hourly.to_dataframe()
 
 # Find indices of maximum and minimum temperatures
 max_temp_index = df['temperature'].idxmax()
