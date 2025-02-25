@@ -89,9 +89,23 @@ def get_colormap_categories():
         'Qualitative': qualitative_cmaps
     }
 
+# Function to handle checkbox selection
+def select_colormap(cmap_name, key_prefix):
+    """Handle checkbox selection to ensure only one is selected at a time"""
+    # Set all checkboxes to False
+    for cmap in st.session_state:
+        if cmap.startswith(f"{key_prefix}_checkbox_"):
+            st.session_state[cmap] = False
+    
+    # Set the selected checkbox to True
+    st.session_state[f"{key_prefix}_checkbox_{cmap_name}"] = True
+    
+    # Update the selected colormap
+    st.session_state[f"{key_prefix}_selected"] = cmap_name
+
 def display_colormap_grid(colormap_categories, selected_category=None, key_prefix="grid"):
     """
-    Display a grid of colormap previews organized by category.
+    Display a list of colormap previews organized by category with checkbox selection.
     
     Parameters:
     - colormap_categories: Dictionary mapping category names to lists of colormap names
@@ -101,13 +115,15 @@ def display_colormap_grid(colormap_categories, selected_category=None, key_prefi
     Returns:
     - Selected colormap name
     """
+    # Initialize session state for selected colormap if not exists
+    if f"{key_prefix}_selected" not in st.session_state:
+        st.session_state[f"{key_prefix}_selected"] = "viridis"
+    
     # If no category is selected, show all categories
     if selected_category is None:
         categories_to_show = list(colormap_categories.keys())
     else:
         categories_to_show = [selected_category]
-    
-    selected_cmap = None
     
     # Create tabs for each category
     tabs = st.tabs(categories_to_show)
@@ -116,27 +132,41 @@ def display_colormap_grid(colormap_categories, selected_category=None, key_prefi
         with tabs[i]:
             st.caption(f"{len(colormap_categories[category])} colormaps")
             
-            # Create a grid layout with 4 columns
-            cols = st.columns(4)
+            # Get all colormap names in this category
+            cmap_names = colormap_categories[category]
             
-            # Display colormaps in the grid
-            for j, cmap_name in enumerate(colormap_categories[category]):
-                with cols[j % 4]:
-                    # Create a container for the colormap
-                    with st.container():
-                        st.caption(cmap_name)
-                        
-                        # Create the colormap preview
-                        fig = create_colormap_preview(cmap_name)
-                        
-                        # Make the preview clickable
-                        if st.button("Select", key=f"{key_prefix}_{category}_{cmap_name}"):
-                            selected_cmap = cmap_name
-                            
-                        # Display the preview
-                        st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+            # Display colormaps in a list with everything on the same horizontal line
+            for cmap_name in cmap_names:
+                # Initialize checkbox state if not exists
+                checkbox_key = f"{key_prefix}_checkbox_{cmap_name}"
+                if checkbox_key not in st.session_state:
+                    st.session_state[checkbox_key] = (cmap_name == st.session_state[f"{key_prefix}_selected"])
+                
+                # Create a horizontal layout with checkbox, name, and preview
+                cols = st.columns([0.5, 1.5, 4])
+                
+                with cols[0]:
+                    # Checkbox for selection
+                    is_selected = st.checkbox(
+                        "",
+                        value=st.session_state[checkbox_key],
+                        key=checkbox_key,
+                        on_change=select_colormap,
+                        args=(cmap_name, key_prefix)
+                    )
+                
+                with cols[1]:
+                    # Display colormap name
+                    st.markdown(f"**{cmap_name}**")
+                
+                with cols[2]:
+                    # Display colormap preview
+                    fig = create_colormap_preview(cmap_name)
+                    st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
     
-    return selected_cmap
+    return st.session_state[f"{key_prefix}_selected"]
+    
+    return st.session_state[f"{key_prefix}_selected"]
 
 def colormap_selector(key_prefix="colormap", display_mode="grid"):
     """
