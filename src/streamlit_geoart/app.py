@@ -72,7 +72,9 @@ def colormap_selector():
         selected_cmap = st.selectbox("Select Colormap", available_cmaps)
         
         # Show preview of selected colormap
-        st.pyplot(create_colormap_preview(selected_cmap))
+        # st.pyplot(create_colormap_preview(selected_cmap))
+        fig = create_colormap_preview(selected_cmap)
+        st.pyplot(fig, bbox_inches='tight', pad_inches=0)
         
         # Options for the selected colormap
         reverse = st.checkbox("Reverse Colormap")
