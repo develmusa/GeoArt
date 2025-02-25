@@ -218,14 +218,17 @@ def colormap_selector(key_prefix="colormap", display_mode="grid"):
     # Get the currently selected colormap
     selected_cmap = st.session_state[f"{key_prefix}_selected"]
     
-    st.subheader("Current Selection")
-    # Show preview of selected colormap
-    fig = create_colormap_preview(selected_cmap)
-    st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
-    
     # Options for the selected colormap
     reverse = st.checkbox("Reverse Colormap", value=st.session_state[f"{key_prefix}_reverse"], key=f"{key_prefix}_reverse_checkbox")
     st.session_state[f"{key_prefix}_reverse"] = reverse
+    
+    # Get the display colormap name with _r suffix if reversed
+    display_cmap = f"{selected_cmap}_r" if reverse else selected_cmap
+    
+    st.subheader(f"Current Selection: {display_cmap}")
+    # Show preview of selected colormap with reverse option
+    fig = create_colormap_preview(display_cmap)
+    st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
 
     # Return the selected configuration
     return {
@@ -331,8 +334,6 @@ session.weather_data = get_weather_data(session.location_coordinates, session.st
 def get_image_wrapper():
     # Apply colormap with reverse option if selected
     cmap = session.style
-    if "_r" in cmap:
-        cmap = cmap.replace("_r", "")
     session.image = get_image(session.weather_data, cmap)
 
 # Use the enhanced colormap selector
