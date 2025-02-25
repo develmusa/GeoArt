@@ -203,17 +203,18 @@ def colormap_selector(key_prefix="colormap", display_mode="grid"):
     all_categories = get_colormap_categories()
     
     # Main area
-    st.subheader("Select a Colormap")
     
-    # Display colormap grid with all categories
-    selected_from_grid = display_colormap_grid(
-        all_categories,
-        key_prefix=f"{key_prefix}_grid"
-    )
-    
-    # Update selected colormap if a new one was selected from the grid
-    if selected_from_grid:
-        st.session_state[f"{key_prefix}_selected"] = selected_from_grid
+    # Create an expander for the colormap selection
+    with st.expander("Select a Colormap", expanded=False):
+        # Display colormap grid with all categories
+        selected_from_grid = display_colormap_grid(
+            all_categories,
+            key_prefix=f"{key_prefix}_grid"
+        )
+        
+        # Update selected colormap if a new one was selected from the grid
+        if selected_from_grid:
+            st.session_state[f"{key_prefix}_selected"] = selected_from_grid
     
     # Get the currently selected colormap
     selected_cmap = st.session_state[f"{key_prefix}_selected"]
