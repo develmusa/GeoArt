@@ -9,6 +9,88 @@ from geoart.image import Image, create_image
 from geoart.weather_data import WeatherData
 from pydantic import BaseModel, Field
 from typing import Any
+import matplotlib as mpl
+from matplotlib import pyplot as plt
+import numpy as np
+
+def create_colormap_preview(cmap_name, width=200, height=30):
+    """Create a preview image for a colormap"""
+    fig, ax = plt.subplots(figsize=(width/100, height/100))
+    gradient = np.linspace(0, 1, width)
+    gradient = np.vstack((gradient, gradient))
+    ax.imshow(gradient, aspect='auto', cmap=cmap_name)
+    ax.axis('off')
+    return fig
+
+def colormap_selector():
+    
+    # Sidebar for categories and filters
+    with st.sidebar:
+        st.subheader("Filter Colormaps")
+        show_sequential = st.checkbox("Sequential", value=True)
+        show_diverging = st.checkbox("Diverging", value=True)
+        show_qualitative = st.checkbox("Qualitative", value=True)
+        
+        # Search box
+        search_term = st.text_input("Search colormaps").lower()
+
+    # Main area
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("Current Selection")
+        # Get available colormaps
+        sequential_cmaps = ['viridis', 'plasma', 'magma', 'inferno']
+        diverging_cmaps = ['RdBu', 'RdYlBu', 'coolwarm']
+        qualitative_cmaps = ['Set1', 'Set2', 'Set3', 'Pastel1']
+        
+        available_cmaps = []
+        if show_sequential:
+            available_cmaps.extend(sequential_cmaps)
+        if show_diverging:
+            available_cmaps.extend(diverging_cmaps)
+        if show_qualitative:
+            available_cmaps.extend(qualitative_cmaps)
+            
+        # Filter by search term
+        if search_term:
+            available_cmaps = [cm for cm in available_cmaps if search_term in cm.lower()]
+        
+        # Current selection
+        selected_cmap = st.selectbox("Select Colormap", available_cmaps)
+        
+        # Show preview of selected colormap
+        st.pyplot(create_colormap_preview(selected_cmap))
+        
+        # Options for the selected colormap
+        reverse = st.checkbox("Reverse Colormap")
+        
+        # Discrete vs Continuous
+        map_type = st.radio("Colormap Type", ["Continuous", "Discrete"])
+        if map_type == "Discrete":
+            n_colors = st.slider("Number of colors", 2, 20, 5)
+
+    with col2:
+        st.subheader("Options")
+        
+        # Range selector
+        st.write("Value Range")
+        min_val = st.number_input("Min", value=0.0)
+        max_val = st.number_input("Max", value=1.0)
+        
+        # Example data preview
+        st.write("Preview with example data")
+        # Here you could add a small plot showing the colormap
+        # applied to some example data
+
+    # Return the selected configuration
+    return {
+        'colormap': selected_cmap,
+        'reverse': reverse,
+        'type': map_type,
+        'n_colors': n_colors if map_type == "Discrete" else None,
+        'range': (min_val, max_val)
+    }
 
 class SessionStateManager(BaseModel):
     # User input fields
@@ -87,6 +169,7 @@ st.set_page_config(
 )
 
 st.title('GeoArt')
+colormap_selector()
 
 st.write("""
     # One Year Temperature
