@@ -15,7 +15,7 @@ import numpy as np
 
 # Cache the colormap preview to improve performance
 @st.cache_data
-def create_colormap_preview(cmap_name, width=200, height=30):
+def create_colormap_preview(cmap_name, width=200, height=15):
     """Create a preview image for a colormap without borders"""
     # Create figure with tight layout and no padding
     fig, ax = plt.subplots(figsize=(width/100, height/100))
@@ -151,27 +151,30 @@ def display_colormap_grid(colormap_categories, selected_category=None, key_prefi
                 if checkbox_key not in st.session_state:
                     st.session_state[checkbox_key] = (cmap_name == st.session_state[f"{key_prefix}_selected"])
                 
-                # Create a horizontal layout with checkbox, name, and preview
-                cols = st.columns([0.5, 1.5, 4])
-                
-                with cols[0]:
-                    # Checkbox for selection
-                    is_selected = st.checkbox(
-                        "",
-                        value=st.session_state[checkbox_key],
-                        key=checkbox_key,
-                        on_change=select_colormap,
-                        args=(cmap_name, key_prefix)
-                    )
-                
-                with cols[1]:
-                    # Display colormap name
-                    st.markdown(f"**{cmap_name}**")
-                
-                with cols[2]:
-                    # Display colormap preview
-                    fig = create_colormap_preview(cmap_name)
-                    st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+                # Create a container for each row
+                with st.container():
+                    # Use a single row with custom HTML for better alignment
+                    col1, col2, col3 = st.columns([0.5, 1.5, 6])
+                    
+                    with col1:
+                        # Checkbox for selection
+                        is_selected = st.checkbox(
+                            "",
+                            value=st.session_state[checkbox_key],
+                            key=checkbox_key,
+                            on_change=select_colormap,
+                            args=(cmap_name, key_prefix),
+                            label_visibility="collapsed"
+                        )
+                    
+                    with col2:
+                        # Display colormap name with vertical alignment
+                        st.markdown(f"<div style='margin-top: 5px;'><b>{cmap_name}</b></div>", unsafe_allow_html=True)
+                    
+                    with col3:
+                        # Display colormap preview
+                        fig = create_colormap_preview(cmap_name)
+                        st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
     
     return st.session_state[f"{key_prefix}_selected"]
 
