@@ -14,14 +14,26 @@ from matplotlib import pyplot as plt
 import numpy as np
 
 def create_colormap_preview(cmap_name, width=200, height=30):
-    """Create a preview image for a colormap"""
+    """Create a preview image for a colormap without borders"""
+    # Create figure with tight layout and no padding
     fig, ax = plt.subplots(figsize=(width/100, height/100))
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)  # Remove padding
+    
+    # Create gradient
     gradient = np.linspace(0, 1, width)
     gradient = np.vstack((gradient, gradient))
+    
+    # Display gradient
     ax.imshow(gradient, aspect='auto', cmap=cmap_name)
+    
+    # Remove axes and borders
     ax.axis('off')
+    fig.patch.set_alpha(0)  # Make figure background transparent
+    
+    # Set tight layout with no padding
+    plt.tight_layout(pad=0)
+    
     return fig
-
 def colormap_selector():
     
     # Sidebar for categories and filters
