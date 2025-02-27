@@ -439,10 +439,9 @@ def create_temperature_gradient_bar(cmap_name, width=600, height=40, min_temp=0,
     ax.tick_params(axis='x', colors='white', labelsize=8)
     ax.tick_params(axis='y', which='both', left=False, labelleft=False)
     
-    # Add white border
+    # Make border transparent
     for spine in ax.spines.values():
-        spine.set_edgecolor('white')
-        spine.set_linewidth(1)
+        spine.set_visible(False)
     
     # Set tight layout with minimal padding
     plt.tight_layout(pad=0.1)
@@ -532,7 +531,7 @@ display_max = st.session_state['custom_range_max']
 gradient_fig = create_temperature_gradient_bar(
     session.style,
     width=600,
-    height=40,
+    height=30,  # Reduced from 40
     min_temp=display_min,
     max_temp=display_max
 )
@@ -752,9 +751,111 @@ def get_image_wrapper():
 # Generate the image with the selected colormap
 get_image_wrapper()
 
+# Create a temperature legend/colorbar
+def create_temperature_legend(cmap_name, min_temp, max_temp, width=600, height=15):  # Reduced height to match colormap preview
+    """Create a temperature legend with the current colormap"""
+    # Create figure with tight layout and no padding
+    fig, ax = plt.subplots(figsize=(width/100, height/100))
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)  # Remove padding
+    
+    # Create gradient
+    gradient = np.linspace(0, 1, width)
+    gradient = np.vstack((gradient, gradient))
+    
+    # Display gradient
+    ax.imshow(gradient, aspect='auto', cmap=cmap_name)
+    
+    # Remove axes and borders
+    ax.axis('off')
+    fig.patch.set_alpha(0)  # Make figure background transparent
+    
+    # Set tight layout with no padding
+    plt.tight_layout(pad=0)
+    
+    return fig
+
 # Display the generated image
 st.header("Generated Temperature Visualization")
 st.image(session.image.get_image())
+
+# Add temperature legend
+st.subheader("Temperature Legend")
+legend_fig = create_temperature_legend(
+    session.style,
+    min_val,  # Use the applied min temperature
+    max_val,  # Use the applied max temperature
+    width=600,
+    height=15
+)
+st.pyplot(legend_fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+
+
+# Add custom temperature ticks below the legend
+# Calculate positions as percentages of the width
+legend_min = min_val
+legend_max = max_val
+legend_width = 100  # percentage width
+
+# Create evenly spaced ticks
+num_ticks = 5
+tick_temps = np.linspace(legend_min, legend_max, num_ticks)
+tick_positions = np.linspace(0, legend_width, num_ticks)
+
+# Add CSS for the ticks if not already added
+st.markdown("""
+<style>
+.legend-tick-container {
+    position: relative;
+    height: 30px;
+    margin-top: -5px;
+    width: 100%;
+    max-width: 100%;
+    overflow: visible;
+    padding: 0 10px;
+    box-sizing: border-box;
+}
+.legend-tick-mark {
+    position: absolute;
+    width: 2px;
+    height: 8px;
+    background-color: rgba(255,255,255,0.9);
+    transform: translateX(-50%);
+}
+.legend-tick-label {
+    position: absolute;
+    font-size: 12px;
+    color: rgba(255,255,255,0.9);
+    transform: translateX(-50%);
+    top: 8px;
+    white-space: nowrap;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# Create HTML for the ticks - use fewer ticks to avoid overcrowding
+num_ticks = 4  # Reduced from 5
+tick_temps = np.linspace(legend_min, legend_max, num_ticks)
+
+# Adjust tick positions slightly to ensure edge labels are fully visible
+tick_positions = [2, 33, 67, 98]  # Adjusted from [0, 33, 67, 100]
+
+tick_html = '<div class="legend-tick-container">'
+for i, (pos, temp) in enumerate(zip(tick_positions, tick_temps)):
+    # Add special alignment for edge ticks
+    if i == 0:  # First tick
+        tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
+        tick_html += f'<div class="legend-tick-label" style="left: {pos}%; text-align: left;">{temp:.1f}°C</div>'
+    elif i == len(tick_positions) - 1:  # Last tick
+        tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
+        tick_html += f'<div class="legend-tick-label" style="left: {pos}%; text-align: right;">{temp:.1f}°C</div>'
+    else:  # Middle ticks
+        tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
+        tick_html += f'<div class="legend-tick-label" style="left: {pos}%;">{temp:.1f}°C</div>'
+tick_html += '</div>'
+
+# Display the ticks
+st.markdown(tick_html, unsafe_allow_html=True)
 
 # This section has been moved to the color selection area
 
