@@ -47,7 +47,12 @@ class WeatherDataError(Exception):
         super().__init__(message)
 
 # Function to fetch weather data
-async def fetch_weather_data(location_point: geolocation.Coordinates, start_date: str, end_date: str) -> WeatherData:
+async def fetch_weather_data(location_point: geolocation.Coordinates, start_date, end_date, timezone: str = "auto") -> WeatherData:
+    # Convert dates to strings if they are date objects
+    if hasattr(start_date, 'strftime'):
+        start_date = start_date.strftime('%Y-%m-%d')
+    if hasattr(end_date, 'strftime'):
+        end_date = end_date.strftime('%Y-%m-%d')
     url = "https://archive-api.open-meteo.com/v1/archive"
     params = {
         "latitude": location_point.latitude,
@@ -55,7 +60,7 @@ async def fetch_weather_data(location_point: geolocation.Coordinates, start_date
         "start_date": start_date,
         "end_date": end_date,
         "hourly": "temperature_2m",
-        "timezone": "auto"
+        "timezone": timezone
     }
     async with httpx.AsyncClient() as client:
         try:
