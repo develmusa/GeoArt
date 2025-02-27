@@ -833,22 +833,22 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Create HTML for the ticks - use fewer ticks to avoid overcrowding
-num_ticks = 4  # Reduced from 5
+# Create HTML for the ticks with a middle tick
+num_ticks = 5  # Increased to 5 to add middle tick
 tick_temps = np.linspace(legend_min, legend_max, num_ticks)
 
-# Adjust tick positions slightly to ensure edge labels are fully visible
-tick_positions = [2, 33, 67, 98]  # Adjusted from [0, 33, 67, 100]
+# Position ticks to match the legend edges with a middle tick
+tick_positions = [0, 25, 50, 75, 100]  # Evenly distributed with middle tick
 
 tick_html = '<div class="legend-tick-container">'
 for i, (pos, temp) in enumerate(zip(tick_positions, tick_temps)):
-    # Add special alignment for edge ticks
+    # Add special alignment and positioning for edge ticks
     if i == 0:  # First tick
         tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
-        tick_html += f'<div class="legend-tick-label" style="left: {pos}%; text-align: left;">{temp:.1f}°C</div>'
+        tick_html += f'<div class="legend-tick-label" style="left: {pos+2}%; text-align: left;">{temp:.1f}°C</div>'
     elif i == len(tick_positions) - 1:  # Last tick
         tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
-        tick_html += f'<div class="legend-tick-label" style="left: {pos}%; text-align: right;">{temp:.1f}°C</div>'
+        tick_html += f'<div class="legend-tick-label" style="left: {pos-2}%; text-align: right;">{temp:.1f}°C</div>'
     else:  # Middle ticks
         tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
         tick_html += f'<div class="legend-tick-label" style="left: {pos}%;">{temp:.1f}°C</div>'
