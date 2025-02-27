@@ -268,7 +268,6 @@ class SessionStateManager(BaseModel):
     # User input fields
     location: str = Field(default="Kopenhagen")
     start_date: datetime.date = Field(default=datetime.date(2023, 1, 1))
-    start_time: datetime.time = Field(default=datetime.time(0, 0))  # Default to midnight
     style: str = Field(default="afmhot")
     min_temp: float | None = Field(default=None)
     max_temp: float | None = Field(default=None)
@@ -342,24 +341,18 @@ def get_location_coordinates(location_str: str) -> geolocation.Coordinates:
         st.stop()
         
 
-@st.cache_data(hash_funcs={geolocation.Coordinates: lambda c: (c.latitude, c.longitude)}, ttl=3600)
+@st.cache_data(hash_funcs={geolocation.Coordinates: lambda c: (c.latitude, c.longitude)})
 def get_weather_data(location: geolocation.Coordinates, start_date: datetime.date, end_date: datetime.date) -> WeatherData:
-    
     try:
         async def async_wrapper() -> WeatherData:
-            return await weather_data.fetch_weather_data(
-                location_point=location,
-                start_date=start_date,
-                end_date=end_date,
-                timezone="auto"
-            )
+            return await weather_data.fetch_weather_data(location_point=location, start_date=start_date, end_date=end_date)
         return asyncio.run(async_wrapper())
     except weather_data.WeatherDataError:
         st.error(f"Could not fetch weather data for {location}, {start_date} to {end_date}")
         st.stop()
     except Exception as e:
         #Todo: Add logging and error tracking do not expose internal errors to the user
-        st.error("An unknown error occurred while fetching weather data")
+        st.error("An unkown error occurred while fetching weather data")
         st.stop()
 
 @st.cache_data(hash_funcs={WeatherData: lambda w: (w.latitude, w.longitude, hash(tuple(w.hourly.temperature_2m)))})
@@ -444,29 +437,10 @@ session = SessionStateManager.from_session_state()
 address = session.location
 start_date = session.start_date
 
-# Get start time from session
-start_time = session.start_time
-
 # Update computed fields
-# Note: The API only uses the date, not the time
-# We still create datetime objects for future use if the API ever supports time
-start_datetime = datetime.datetime.combine(start_date, start_time)
-# Create end datetime (one year later)
-end_datetime = datetime.datetime.combine(
-    start_date.replace(year=start_date.year + 1),
-    start_time
-)
-session.end_date = end_datetime.date()
-
-# Get location coordinates
+session.end_date = start_date.replace(year=start_date.year + 1)
 session.location_coordinates = get_location_coordinates(address)
-
-# Fetch weather data
-session.weather_data = get_weather_data(
-    session.location_coordinates,
-    session.start_date,
-    session.end_date
-)
+session.weather_data = get_weather_data(session.location_coordinates, session.start_date, session.end_date)
 
 # Get temperature range for the data to use as hints
 df = session.weather_data.hourly.to_dataframe()
@@ -978,40 +952,17 @@ with input_col1:
         label="Location",
         value=address,
         key="location",
-        placeholder="Enter city name or coordinates",
         help="Enter an address (e.g., 'New York') or coordinates (e.g., '47.3769° N, 8.5417° E')"
     )
 
 with input_col2:
-    new_start_date = st.date_input(
-        "Start Date",
-        value=start_date,
-        min_value=datetime.date(1940, 1, 1),
-        max_value=datetime.datetime.now() - datetime.timedelta(days=366),
-        key="start_date"
-    )
-
-# Add time control in a second row
-new_start_time = st.time_input(
-    "Start Time",
-    value=session.start_time,
-    key="start_time",
-    help="Select the start time for the temperature data (Note: The API only uses the date, not the time)"
-)
+    new_start_date = st.date_input("Start Date", value=start_date, min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
 
 # Check if inputs have changed and trigger a rerun if needed
-if (new_address != address or
-    new_start_date != start_date or
-    new_start_time != session.start_time):
-    # Update session state
-    session.start_date = new_start_date
-    session.start_time = new_start_time
+if new_address != address or new_start_date != start_date:
     st.rerun()
 
 # Add temperature statistics below the input controls
-st.subheader("Temperature Statistics")
-
-# Create columns for statistics
 stat_col1, stat_col2 = st.columns(2)
 
 # Find indices of maximum and minimum temperatures
@@ -1055,7 +1006,6 @@ with st.sidebar.expander("Location", expanded=False):
         label="",
         value=address,
         key="sidebar_location",
-        placeholder="Enter city name or coordinates",
         help="Enter an address (e.g., 'New York') or coordinates (e.g., '47.3769° N, 8.5417° E')"
     )
     
@@ -1069,40 +1019,8 @@ with st.sidebar.expander("Location", expanded=False):
         'lat': [session.location_coordinates.latitude],
         'lon': [session.location_coordinates.longitude]
     })
+    
     # Display the map with the location
     st.map(data=map_data, zoom=10, use_container_width=True)
 
-# Add time and date settings in the sidebar
-with st.sidebar.expander("Time and Date Settings", expanded=False):
-    st.subheader("Date and Time Settings")
-    
-    # Date input for start date
-    new_start_date = st.date_input(
-        "Start Date",
-        value=start_date,
-        min_value=datetime.date(1940, 1, 1),
-        max_value=datetime.datetime.now() - datetime.timedelta(days=366),
-        key="sidebar_start_date",
-        help="Select the start date for the temperature data (one year of data will be shown)"
-    )
-    
-    # Time input for start time
-    new_start_time = st.time_input(
-        "Start Time",
-        value=session.start_time,
-        key="sidebar_start_time",
-        help="Select the start time for the temperature data (Note: The API only uses the date, not the time)"
-    )
-    
-    # Display the end date (read-only)
-    end_date = new_start_date.replace(year=new_start_date.year + 1)
-    st.info(f"End Date: {end_date.strftime('%Y-%m-%d')} (one year period)")
-    
-    # Check if date or time has changed and trigger a rerun if needed
-    if (new_start_date != start_date or
-        new_start_time != session.start_time):
-        # Update session state
-        session.start_date = new_start_date
-        session.start_time = new_start_time
-        st.rerun()
 
