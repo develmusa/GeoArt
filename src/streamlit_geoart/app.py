@@ -498,12 +498,34 @@ if 'max_temp_set' not in st.session_state:
     if session.max_temp is None:
         session.max_temp = max_data_temp
 
+# Initialize extended range mode
+if 'extended_range_mode' not in st.session_state:
+    st.session_state['extended_range_mode'] = False
+
+# Initialize custom range limits with defaults if not set
+data_range = max_data_temp - min_data_temp
+if 'custom_range_min' not in st.session_state:
+    # Default to data range minus 50%
+    st.session_state['custom_range_min'] = min_data_temp - (data_range * 0.5)
+
+if 'custom_range_max' not in st.session_state:
+    # Default to data range plus 50%
+    st.session_state['custom_range_max'] = max_data_temp + (data_range * 0.5)
+
 # Store current values for validation
 current_min = float(session.min_temp)
 current_max = float(session.max_temp)
 
 # Create the visual temperature range selector
 st.write("### Visual Temperature Range Selector")
+
+# Add toggle for extended range mode
+extended_range = st.checkbox(
+    "Enable Extended Range Mode",
+    value=st.session_state['extended_range_mode'],
+    help="Allow setting temperature ranges beyond the data range for specialized visualization needs."
+)
+st.session_state['extended_range_mode'] = extended_range
 
 # Get the current colormap
 try:
@@ -512,21 +534,79 @@ except KeyError:
     base_cmap = session.style.replace('_r', '')
     colormap = mpl.colormaps[base_cmap].reversed()
 
-# Create the gradient bar visualization
+# If extended range is enabled, show custom range inputs
+if extended_range:
+    st.write("#### Custom Range Limits")
+    st.caption("Define the minimum and maximum selectable temperature values for the slider.")
+    
+    # Create two columns for min/max inputs
+    custom_col1, custom_col2 = st.columns(2)
+    
+    with custom_col1:
+        # Input for minimum range limit
+        custom_min = st.number_input(
+            "Minimum Selectable Temperature (°C)",
+            value=float(st.session_state['custom_range_min']),
+            step=1.0,
+            help="The lowest temperature value that can be selected on the slider."
+        )
+        st.session_state['custom_range_min'] = custom_min
+    
+    with custom_col2:
+        # Input for maximum range limit
+        custom_max = st.number_input(
+            "Maximum Selectable Temperature (°C)",
+            value=float(st.session_state['custom_range_max']),
+            step=1.0,
+            help="The highest temperature value that can be selected on the slider."
+        )
+        st.session_state['custom_range_max'] = custom_max
+    
+    # Validate that min < max
+    if custom_min >= custom_max:
+        st.error("Minimum range limit must be less than maximum range limit.")
+        # Reset to valid values
+        custom_min = min(custom_min, custom_max - 1)
+        custom_max = max(custom_max, custom_min + 1)
+        st.session_state['custom_range_min'] = custom_min
+        st.session_state['custom_range_max'] = custom_max
+    
+    # Add note about extended range
+    st.caption("Extended range mode enabled: You can set values beyond the actual data range.")
+
+# Calculate display range for gradient bar
+if extended_range:
+    # Use custom range limits for display
+    display_min = st.session_state['custom_range_min']
+    display_max = st.session_state['custom_range_max']
+else:
+    # Use data range for display
+    display_min = min_data_temp
+    display_max = max_data_temp
+
+# Create the gradient bar visualization with appropriate range
 gradient_fig = create_temperature_gradient_bar(
     session.style,
     width=600,
     height=40,
-    min_temp=min_data_temp,
-    max_temp=max_data_temp
+    min_temp=display_min,
+    max_temp=display_max
 )
 
 # Display the gradient bar
 st.pyplot(gradient_fig, use_container_width=True)
 
-# Add the range slider
-slider_min = float(min_data_temp)
-slider_max = float(max_data_temp)
+# Set slider range based on mode
+if extended_range:
+    # In extended mode, use custom range limits
+    slider_min = float(st.session_state['custom_range_min'])
+    slider_max = float(st.session_state['custom_range_max'])
+else:
+    # In normal mode, constrain to data range
+    slider_min = float(min_data_temp)
+    slider_max = float(max_data_temp)
+
+# Calculate appropriate step size
 slider_step = (slider_max - slider_min) / 100  # 100 steps across the range
 
 # Create a slider with the current min/max values
@@ -546,6 +626,24 @@ if temp_range != (current_min, current_max):
     update_temp_range(temp_range)
     # Force rerun to update the visualization
     st.rerun()
+
+# Show data range indicators on the slider
+if extended_range:
+    # Calculate positions as percentages of the slider width
+    min_pos = (min_data_temp - slider_min) / (slider_max - slider_min) * 100
+    max_pos = (max_data_temp - slider_min) / (slider_max - slider_min) * 100
+    
+    # Only show indicators if they're within the visible range (0-100%)
+    if 0 <= min_pos <= 100 or 0 <= max_pos <= 100:
+        # Add data range indicators using custom HTML/CSS
+        st.markdown(f"""
+        <div style="position: relative; height: 20px; margin-top: -15px; margin-bottom: 10px;">
+            {f'<div style="position: absolute; left: {min_pos}%; transform: translateX(-50%); width: 2px; height: 10px; background-color: rgba(255,255,255,0.7);"></div>' if 0 <= min_pos <= 100 else ''}
+            {f'<div style="position: absolute; left: {min_pos}%; transform: translateX(-50%); top: 12px; font-size: 10px; color: rgba(255,255,255,0.7);">Data Min</div>' if 0 <= min_pos <= 100 else ''}
+            {f'<div style="position: absolute; left: {max_pos}%; transform: translateX(-50%); width: 2px; height: 10px; background-color: rgba(255,255,255,0.7);"></div>' if 0 <= max_pos <= 100 else ''}
+            {f'<div style="position: absolute; left: {max_pos}%; transform: translateX(-50%); top: 12px; font-size: 10px; color: rgba(255,255,255,0.7);">Data Max</div>' if 0 <= max_pos <= 100 else ''}
+        </div>
+        """, unsafe_allow_html=True)
 
 # Add explanations for contrast operations
 st.markdown("""
