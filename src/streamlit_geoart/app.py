@@ -245,6 +245,8 @@ class SessionStateManager(BaseModel):
     location: str = Field(default="Kopenhagen")
     start_date: datetime.date = Field(default=datetime.date(2023, 1, 1))
     style: str = Field(default="afmhot")
+    min_temp: float | None = Field(default=None)
+    max_temp: float | None = Field(default=None)
     
     # Computed fields
     end_date: datetime.date | None = Field(default=None)
@@ -303,10 +305,10 @@ def get_weather_data(location: geolocation.Coordinates, start_date: datetime.dat
         st.stop()
 
 @st.cache_data(hash_funcs={WeatherData: lambda w: (w.latitude, w.longitude, hash(tuple(w.hourly.temperature_2m)))})
-def get_image(weather_data: WeatherData, color_map: str) -> Image:
+def get_image(weather_data: WeatherData, color_map: str, min_temp: float = None, max_temp: float = None) -> Image:
     try:
-        return create_image(weather_data.hourly.to_dataframe(), color_map)
-    except Exception as e:  
+        return create_image(weather_data.hourly.to_dataframe(), color_map, min_temp, max_temp)
+    except Exception as e:
         #Todo: Add logging and error tracking do not expose internal errors to the user
         st.error("An unkown error occurred while generating image")
         st.stop()
@@ -326,7 +328,7 @@ st.write("""
 # Initialize or get existing session state
 session = SessionStateManager.from_session_state()
 
-form_col1, form_col2= st.columns(2)
+form_col1, form_col2 = st.columns(2)
 address = form_col1.text_input(label="Location", key="location")
 start_date = form_col2.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
 
@@ -335,10 +337,86 @@ session.end_date = start_date.replace(year=start_date.year + 1)
 session.location_coordinates = get_location_coordinates(address)
 session.weather_data = get_weather_data(session.location_coordinates, session.start_date, session.end_date)
 
+# Get temperature range for the data to use as hints
+df = session.weather_data.hourly.to_dataframe()
+min_data_temp = float(df['temperature'].min())
+max_data_temp = float(df['temperature'].max())
+
+# Temperature range controls
+st.header("Temperature Range")
+st.info(f"Data temperature range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C")
+st.caption("Adjust min/max temperature values to control the color mapping range.")
+
+# Initialize session state for tracking if min/max temp have been set
+if 'min_temp_set' not in st.session_state:
+    st.session_state['min_temp_set'] = False
+    # Initialize with data min on first load
+    if session.min_temp is None:
+        session.min_temp = min_data_temp
+
+if 'max_temp_set' not in st.session_state:
+    st.session_state['max_temp_set'] = False
+    # Initialize with data max on first load
+    if session.max_temp is None:
+        session.max_temp = max_data_temp
+
+# Add a button to reset to data range
+if st.button("Reset to Data Range"):
+    # Set the temperature values to the data range
+    session.min_temp = min_data_temp
+    session.max_temp = max_data_temp
+    # Reset the flags
+    st.session_state['min_temp_set'] = False
+    st.session_state['max_temp_set'] = False
+    # Force rerun with the new values
+    st.rerun()
+
+# Store current values for validation
+current_min = float(session.min_temp)
+current_max = float(session.max_temp)
+
+temp_col1, temp_col2 = st.columns(2)
+with temp_col1:
+    min_temp = st.number_input(
+        "Min Temperature (°C)",
+        value=current_min,
+        step=1.0,
+        help="Minimum temperature for color mapping."
+    )
+    
+    # Update session state
+    if min_temp <= current_max:
+        session.min_temp = min_temp
+        if not st.session_state['min_temp_set'] and min_temp != min_data_temp:
+            st.session_state['min_temp_set'] = True
+    else:
+        # If min > max, show error and don't update
+        st.error("Min temperature cannot be greater than max temperature")
+        # Reset to previous valid value
+        session.min_temp = current_min
+
+with temp_col2:
+    # Ensure max_temp is at least min_temp
+    max_temp = st.number_input(
+        "Max Temperature (°C)",
+        value=max(current_max, min_temp),
+        min_value=min_temp,  # Enforce min_temp as the minimum allowed value
+        step=1.0,
+        help="Maximum temperature for color mapping."
+    )
+    
+    # Update session state
+    session.max_temp = max_temp
+    if not st.session_state['max_temp_set'] and max_temp != max_data_temp:
+        st.session_state['max_temp_set'] = True
+
+# Add a note about the validation
+st.caption("Note: Maximum temperature must be greater than or equal to minimum temperature.")
+
 def get_image_wrapper():
     # Apply colormap with reverse option if selected
     cmap = session.style
-    session.image = get_image(session.weather_data, cmap)
+    session.image = get_image(session.weather_data, cmap, session.min_temp, session.max_temp)
 
 # Use the enhanced colormap selector
 st.header("Colormap Selection")
@@ -357,9 +435,42 @@ get_image_wrapper()
 st.header("Generated Temperature Visualization")
 st.image(session.image.get_image())
 
+# Create a color legend
+cmap_name = session.style
+fig, ax = plt.subplots(figsize=(10, 0.5))
+plt.subplots_adjust(left=0.05, right=0.95)
+
+# Get the actual min/max values used for normalization
+min_val = session.min_temp if session.min_temp is not None else df['temperature'].min()
+max_val = session.max_temp if session.max_temp is not None else df['temperature'].max()
+
+# Create a color bar
+norm = mpl.colors.Normalize(vmin=min_val, vmax=max_val)
+# Make sure we're using the correct colormap name (handle _r suffix)
+try:
+    colormap = mpl.colormaps[cmap_name]
+except KeyError:
+    # If the colormap with _r suffix doesn't exist, use the base colormap and reverse it
+    base_cmap = cmap_name.replace('_r', '')
+    colormap = mpl.colormaps[base_cmap].reversed()
+
+cb = mpl.colorbar.ColorbarBase(ax, cmap=colormap, norm=norm, orientation='horizontal')
+cb.set_label('Temperature (°C)')
+st.pyplot(fig)
+
+# Add explanation of color mapping
+if st.session_state.get('min_temp_set', False) or st.session_state.get('max_temp_set', False):
+    st.info(f"""
+    **Custom Color Mapping Applied:**
+    - Data temperature range: {df['temperature'].min():.1f}°C to {df['temperature'].max():.1f}°C
+    - Color mapping range: {min_val:.1f}°C to {max_val:.1f}°C
+    
+    Values outside this range will be clipped to the min/max colors.
+    """)
+else:
+    st.caption("Color mapping uses the full data temperature range. Adjust the min/max temperature controls to customize.")
+
 col1, col2, col3 = st.columns(3)
-# Convert hourly weather data to a DataFrame
-df = session.weather_data.hourly.to_dataframe()
 
 # Find indices of maximum and minimum temperatures
 max_temp_index = df['temperature'].idxmax()
