@@ -522,44 +522,7 @@ except KeyError:
     base_cmap = session.style.replace('_r', '')
     colormap = mpl.colormaps[base_cmap].reversed()
 
-# Add advanced options in an expandable section
-with st.expander("Advanced Range Options", expanded=False):
-    st.write("#### Selectable Temperature Range")
-    st.caption("Define the minimum and maximum selectable temperature values for the slider.")
-    
-    # Create two columns for min/max inputs
-    custom_col1, custom_col2 = st.columns(2)
-    
-    with custom_col1:
-        # Input for minimum range limit
-        custom_min = st.number_input(
-            "Minimum Selectable Temperature (°C)",
-            value=float(st.session_state['custom_range_min']),
-            step=1.0,
-            help="The lowest temperature value that can be selected on the slider."
-        )
-        st.session_state['custom_range_min'] = custom_min
-    
-    with custom_col2:
-        # Input for maximum range limit
-        custom_max = st.number_input(
-            "Maximum Selectable Temperature (°C)",
-            value=float(st.session_state['custom_range_max']),
-            step=1.0,
-            help="The highest temperature value that can be selected on the slider."
-        )
-        st.session_state['custom_range_max'] = custom_max
-    
-    # Validate that min < max
-    if custom_min >= custom_max:
-        st.error("Minimum range limit must be less than maximum range limit.")
-        # Reset to valid values
-        custom_min = min(custom_min, custom_max - 1)
-        custom_max = max(custom_max, custom_min + 1)
-        st.session_state['custom_range_min'] = custom_min
-        st.session_state['custom_range_max'] = custom_max
-        
-    st.caption("Note: Changes to these values will affect the range of temperatures that can be selected on the slider.")
+# No replacement needed - removing the duplicate expander
 
 # Calculate display range for gradient bar
 display_min = st.session_state['custom_range_min']
@@ -646,147 +609,105 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Add number inputs for precise temperature control
-st.caption("Fine-tune temperature values with precise inputs:")
-temp_input_col1, temp_input_col2 = st.columns(2)
-
-with temp_input_col1:
-    min_temp_input = st.number_input(
-        "Min Temperature (°C)",
-        value=temp_range[0],
-        min_value=slider_min,
-        max_value=temp_range[1] - slider_step,  # Ensure min < max
-        step=slider_step,
-        format="%.1f",
-        help="Minimum temperature for color mapping."
-    )
-
-with temp_input_col2:
-    max_temp_input = st.number_input(
-        "Max Temperature (°C)",
-        value=temp_range[1],
-        min_value=min_temp_input + slider_step,  # Ensure max > min
-        max_value=slider_max,
-        step=slider_step,
-        format="%.1f",
-        help="Maximum temperature for color mapping."
-    )
-
-# Update session state based on either slider or number inputs
-if (min_temp_input, max_temp_input) != temp_range:
-    # Number inputs have changed
-    update_temp_range((min_temp_input, max_temp_input))
-    # Force rerun to update the visualization
-    st.rerun()
-elif temp_range != (current_min, current_max):
+# Update session state based on slider values
+if temp_range != (current_min, current_max):
     # Slider has changed
     update_temp_range(temp_range)
     # Force rerun to update the visualization
     st.rerun()
 
-# Add explanations for contrast operations
-st.markdown("""
-**Contrast Operations:**
-- **Contrast Stretching**: Maps the full temperature range to the full color range, showing the complete data distribution.
-- **Enhance Contrast**: Narrows the mapping range by 10% from each end, enhancing visibility of mid-range temperatures.
-""")
-
-# Add buttons for common operations
-col1, col2 = st.columns(2)
-with col1:
-    # Add a button for contrast stretching (reset to data range)
-    if st.button("Apply Contrast Stretching", help="Maps the full temperature range to the full color range. This maximizes the use of all available colors across the entire data range."):
-        # Set the temperature values to the data range
-        session.min_temp = min_data_temp
-        session.max_temp = max_data_temp
-        # Reset the flags
-        st.session_state['min_temp_set'] = False
-        st.session_state['max_temp_set'] = False
-        # Force rerun with the new values
-        st.rerun()
-        
-with col2:
-    # Add a button for enhancing contrast with a narrower range
-    if st.button("Enhance Contrast", help="Narrows the mapping range by 10% from each end. This increases contrast in the middle range where most temperature values typically fall."):
-        # Calculate a narrower range (e.g., 10% in from each end)
-        range_size = max_data_temp - min_data_temp
-        enhanced_min = min_data_temp + (range_size * 0.1)
-        enhanced_max = max_data_temp - (range_size * 0.1)
-        
-        # Set the temperature values to the enhanced range
-        session.min_temp = enhanced_min
-        session.max_temp = enhanced_max
-        # Set the flags
-        st.session_state['min_temp_set'] = True
-        st.session_state['max_temp_set'] = True
-        # Force rerun with the new values
-        st.rerun()
-
-# Add a collapsible section for manual input (as fallback)
-with st.expander("Manual Temperature Input", expanded=False):
-    st.caption("Fine-tune temperature values manually if needed.")
+# Add advanced options in an expandable section
+with st.expander("Advanced Temperature Options", expanded=False):
+    st.write("#### Fine-tune Temperature Values")
+    st.caption("Adjust temperature values with precise inputs:")
     
-    temp_col1, temp_col2 = st.columns(2)
-    with temp_col1:
-        # Calculate min color right before using it
-        min_color = mpl.colors.rgb2hex(colormap(0))
-        
-        # Create a container for the min temperature input and color indicator
-        st.markdown(f"""
-        <div style="display: flex; align-items: center; margin-bottom: 5px;">
-            <div style="width: 20px; height: 20px; background-color: {min_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
-            <div style="font-weight: bold;">Min Temperature (°C)</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        min_temp = st.number_input(
-            "",  # Empty label since we're using custom label above
-            value=current_min,
-            step=1.0,
-            help="Minimum temperature for color mapping.",
-            label_visibility="collapsed"  # Hide the default label
+    temp_input_col1, temp_input_col2 = st.columns(2)
+    
+    with temp_input_col1:
+        min_temp_input = st.number_input(
+            "Min Temperature (°C)",
+            value=temp_range[0],
+            min_value=slider_min,
+            max_value=temp_range[1] - slider_step,  # Ensure min < max
+            step=slider_step,
+            format="%.1f",
+            help="Minimum temperature for color mapping."
         )
-        
-        # Update session state
-        if min_temp <= current_max:
-            session.min_temp = min_temp
-            if not st.session_state['min_temp_set'] and min_temp != min_data_temp:
-                st.session_state['min_temp_set'] = True
-        else:
-            # If min > max, show error and don't update
-            st.error("Min temperature cannot be greater than max temperature")
-            # Reset to previous valid value
-            session.min_temp = current_min
-
-    with temp_col2:
-        # Calculate max color right before using it
-        max_color = mpl.colors.rgb2hex(colormap(1))
-        
-        # Create a container for the max temperature input and color indicator
-        st.markdown(f"""
-        <div style="display: flex; align-items: center; margin-bottom: 5px;">
-            <div style="width: 20px; height: 20px; background-color: {max_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
-            <div style="font-weight: bold;">Max Temperature (°C)</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Ensure max_temp is at least min_temp
-        max_temp = st.number_input(
-            "",  # Empty label since we're using custom label above
-            value=max(current_max, min_temp),
-            min_value=min_temp,  # Enforce min_temp as the minimum allowed value
-            step=1.0,
-            help="Maximum temperature for color mapping.",
-            label_visibility="collapsed"  # Hide the default label
+    
+    with temp_input_col2:
+        max_temp_input = st.number_input(
+            "Max Temperature (°C)",
+            value=temp_range[1],
+            min_value=min_temp_input + slider_step,  # Ensure max > min
+            max_value=slider_max,
+            step=slider_step,
+            format="%.1f",
+            help="Maximum temperature for color mapping."
         )
+    
+    # Update session state based on number inputs
+    if (min_temp_input, max_temp_input) != temp_range:
+        # Number inputs have changed
+        update_temp_range((min_temp_input, max_temp_input))
+        # Force rerun to update the visualization
+        st.rerun()
+    
+    st.write("#### Selectable Temperature Range")
+    st.caption("Define the minimum and maximum selectable temperature values for the slider.")
+    
+    # Create two columns for min/max inputs
+    custom_col1, custom_col2 = st.columns(2)
+    
+    with custom_col1:
+        # Input for minimum range limit
+        custom_min = st.number_input(
+            "Minimum Selectable Temperature (°C)",
+            value=float(st.session_state['custom_range_min']),
+            step=1.0,
+            help="The lowest temperature value that can be selected on the slider."
+        )
+        st.session_state['custom_range_min'] = custom_min
+    
+    with custom_col2:
+        # Input for maximum range limit
+        custom_max = st.number_input(
+            "Maximum Selectable Temperature (°C)",
+            value=float(st.session_state['custom_range_max']),
+            step=1.0,
+            help="The highest temperature value that can be selected on the slider."
+        )
+        st.session_state['custom_range_max'] = custom_max
         
-        # Update session state
-        session.max_temp = max_temp
-        if not st.session_state['max_temp_set'] and max_temp != max_data_temp:
-            st.session_state['max_temp_set'] = True
+        # Check if range values have changed and trigger rerun
+        if 'prev_custom_min' not in st.session_state or 'prev_custom_max' not in st.session_state or \
+           custom_min != st.session_state.get('prev_custom_min') or custom_max != st.session_state.get('prev_custom_max'):
+            st.session_state['prev_custom_min'] = custom_min
+            st.session_state['prev_custom_max'] = custom_max
+            st.rerun()
+    
+    # Validate that min < max
+    if custom_min >= custom_max:
+        st.error("Minimum range limit must be less than maximum range limit.")
+        # Reset to valid values
+        custom_min = min(custom_min, custom_max - 1)
+        custom_max = max(custom_max, custom_min + 1)
+        st.session_state['custom_range_min'] = custom_min
+        st.session_state['custom_range_max'] = custom_max
+        
 
-    # Add a note about the validation
-    st.caption("Note: Maximum temperature must be greater than or equal to minimum temperature.")
+
+
+# Add reset button
+if st.button("Reset to Default Range", help="Resets to the full data range. This maximizes the use of all available colors across the entire data range."):
+    # Set the temperature values to the data range
+    session.min_temp = min_data_temp
+    session.max_temp = max_data_temp
+    # Reset the flags
+    st.session_state['min_temp_set'] = False
+    st.session_state['max_temp_set'] = False
+    # Force rerun with the new values
+    st.rerun()
+
 
 def get_temperature_range(min_temp, max_temp, df):
     """
@@ -821,7 +742,7 @@ if st.session_state.get('min_temp_set', False) or st.session_state.get('max_temp
     Values outside this range will be clipped to the min/max colors, enhancing contrast within the selected range.
     """)
 else:
-    st.caption("Full contrast stretching applied (using entire data range). Use the temperature controls above to enhance specific ranges.")
+    pass
 
 def get_image_wrapper():
     # Apply colormap with reverse option if selected
