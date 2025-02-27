@@ -401,6 +401,74 @@ df = session.weather_data.hourly.to_dataframe()
 min_data_temp = float(df['temperature'].min())
 max_data_temp = float(df['temperature'].max())
 
+# Create a gradient bar visualization for temperature range selection
+@st.cache_data
+def create_temperature_gradient_bar(cmap_name, width=600, height=40, min_temp=0, max_temp=40):
+    """
+    Create a gradient bar visualization for temperature range selection
+    
+    Args:
+        cmap_name: Name of the colormap to use
+        width: Width of the gradient bar in pixels
+        height: Height of the gradient bar in pixels
+        min_temp: Minimum temperature value
+        max_temp: Maximum temperature value
+        
+    Returns:
+        Matplotlib figure with gradient bar
+    """
+    # Create figure with tight layout and no padding
+    fig, ax = plt.subplots(figsize=(width/100, height/100))
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)  # Remove padding
+    
+    # Create gradient
+    gradient = np.linspace(0, 1, width)
+    gradient = np.vstack((gradient, gradient))
+    
+    # Display gradient
+    ax.imshow(gradient, aspect='auto', cmap=cmap_name)
+    
+    # Add temperature ticks
+    num_ticks = 5  # Number of ticks to show
+    tick_positions = np.linspace(0, width-1, num_ticks)
+    tick_labels = np.linspace(min_temp, max_temp, num_ticks)
+    ax.set_xticks(tick_positions)
+    ax.set_xticklabels([f"{t:.1f}°C" for t in tick_labels])
+    
+    # Style the ticks
+    ax.tick_params(axis='x', colors='white', labelsize=8)
+    ax.tick_params(axis='y', which='both', left=False, labelleft=False)
+    
+    # Add white border
+    for spine in ax.spines.values():
+        spine.set_edgecolor('white')
+        spine.set_linewidth(1)
+    
+    # Set tight layout with minimal padding
+    plt.tight_layout(pad=0.1)
+    
+    return fig
+
+# Function to handle temperature range slider changes
+def update_temp_range(values):
+    """Update temperature range based on slider values"""
+    min_val, max_val = values
+    
+    # Update session state
+    session.min_temp = min_val
+    session.max_temp = max_val
+    
+    # Update flags
+    if min_val != min_data_temp:
+        st.session_state['min_temp_set'] = True
+    else:
+        st.session_state['min_temp_set'] = False
+        
+    if max_val != max_data_temp:
+        st.session_state['max_temp_set'] = True
+    else:
+        st.session_state['max_temp_set'] = False
+
 # Temperature range controls
 # Use the enhanced colormap selector
 st.header("Colormap Selection")
@@ -415,7 +483,7 @@ else:
 # Temperature range mapping section (now part of color selection)
 st.subheader("Temperature Range Mapping")
 st.info(f"Data temperature range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C")
-st.caption("Adjust min/max temperature values to control the color mapping range and enhance visualization.")
+st.caption("Adjust the temperature range using the slider or input fields below to control the color mapping and enhance visualization.")
 
 # Initialize session state for tracking if min/max temp have been set
 if 'min_temp_set' not in st.session_state:
@@ -429,6 +497,55 @@ if 'max_temp_set' not in st.session_state:
     # Initialize with data max on first load
     if session.max_temp is None:
         session.max_temp = max_data_temp
+
+# Store current values for validation
+current_min = float(session.min_temp)
+current_max = float(session.max_temp)
+
+# Create the visual temperature range selector
+st.write("### Visual Temperature Range Selector")
+
+# Get the current colormap
+try:
+    colormap = mpl.colormaps[session.style]
+except KeyError:
+    base_cmap = session.style.replace('_r', '')
+    colormap = mpl.colormaps[base_cmap].reversed()
+
+# Create the gradient bar visualization
+gradient_fig = create_temperature_gradient_bar(
+    session.style,
+    width=600,
+    height=40,
+    min_temp=min_data_temp,
+    max_temp=max_data_temp
+)
+
+# Display the gradient bar
+st.pyplot(gradient_fig, use_container_width=True)
+
+# Add the range slider
+slider_min = float(min_data_temp)
+slider_max = float(max_data_temp)
+slider_step = (slider_max - slider_min) / 100  # 100 steps across the range
+
+# Create a slider with the current min/max values
+temp_range = st.slider(
+    "Temperature Range",
+    min_value=slider_min,
+    max_value=slider_max,
+    value=(current_min, current_max),
+    step=slider_step,
+    format="%.1f°C",
+    key="temp_range_slider",
+    help="Drag the handles to adjust the minimum and maximum temperature values for color mapping."
+)
+
+# Update the session state based on slider values
+if temp_range != (current_min, current_max):
+    update_temp_range(temp_range)
+    # Force rerun to update the visualization
+    st.rerun()
 
 # Add explanations for contrast operations
 st.markdown("""
@@ -468,81 +585,71 @@ with col2:
         # Force rerun with the new values
         st.rerun()
 
-# Store current values for validation
-current_min = float(session.min_temp)
-current_max = float(session.max_temp)
+# Add a collapsible section for manual input (as fallback)
+with st.expander("Manual Temperature Input", expanded=False):
+    st.caption("Fine-tune temperature values manually if needed.")
+    
+    temp_col1, temp_col2 = st.columns(2)
+    with temp_col1:
+        # Calculate min color right before using it
+        min_color = mpl.colors.rgb2hex(colormap(0))
+        
+        # Create a container for the min temperature input and color indicator
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <div style="width: 20px; height: 20px; background-color: {min_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
+            <div style="font-weight: bold;">Min Temperature (°C)</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        min_temp = st.number_input(
+            "",  # Empty label since we're using custom label above
+            value=current_min,
+            step=1.0,
+            help="Minimum temperature for color mapping.",
+            label_visibility="collapsed"  # Hide the default label
+        )
+        
+        # Update session state
+        if min_temp <= current_max:
+            session.min_temp = min_temp
+            if not st.session_state['min_temp_set'] and min_temp != min_data_temp:
+                st.session_state['min_temp_set'] = True
+        else:
+            # If min > max, show error and don't update
+            st.error("Min temperature cannot be greater than max temperature")
+            # Reset to previous valid value
+            session.min_temp = current_min
 
-temp_col1, temp_col2 = st.columns(2)
-with temp_col1:
-    # Calculate min color right before using it
-    try:
-        colormap = mpl.colormaps[session.style]
-    except KeyError:
-        base_cmap = session.style.replace('_r', '')
-        colormap = mpl.colormaps[base_cmap].reversed()
-    min_color = mpl.colors.rgb2hex(colormap(0))
-    
-    # Create a container for the min temperature input and color indicator
-    st.markdown(f"""
-    <div style="display: flex; align-items: center; margin-bottom: 5px;">
-        <div style="width: 20px; height: 20px; background-color: {min_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
-        <div style="font-weight: bold;">Min Temperature (°C)</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    min_temp = st.number_input(
-        "",  # Empty label since we're using custom label above
-        value=current_min,
-        step=1.0,
-        help="Minimum temperature for color mapping.",
-        label_visibility="collapsed"  # Hide the default label
-    )
-    
-    # Update session state
-    if min_temp <= current_max:
-        session.min_temp = min_temp
-        if not st.session_state['min_temp_set'] and min_temp != min_data_temp:
-            st.session_state['min_temp_set'] = True
-    else:
-        # If min > max, show error and don't update
-        st.error("Min temperature cannot be greater than max temperature")
-        # Reset to previous valid value
-        session.min_temp = current_min
+    with temp_col2:
+        # Calculate max color right before using it
+        max_color = mpl.colors.rgb2hex(colormap(1))
+        
+        # Create a container for the max temperature input and color indicator
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <div style="width: 20px; height: 20px; background-color: {max_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
+            <div style="font-weight: bold;">Max Temperature (°C)</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Ensure max_temp is at least min_temp
+        max_temp = st.number_input(
+            "",  # Empty label since we're using custom label above
+            value=max(current_max, min_temp),
+            min_value=min_temp,  # Enforce min_temp as the minimum allowed value
+            step=1.0,
+            help="Maximum temperature for color mapping.",
+            label_visibility="collapsed"  # Hide the default label
+        )
+        
+        # Update session state
+        session.max_temp = max_temp
+        if not st.session_state['max_temp_set'] and max_temp != max_data_temp:
+            st.session_state['max_temp_set'] = True
 
-with temp_col2:
-    # Calculate max color right before using it
-    try:
-        colormap = mpl.colormaps[session.style]
-    except KeyError:
-        base_cmap = session.style.replace('_r', '')
-        colormap = mpl.colormaps[base_cmap].reversed()
-    max_color = mpl.colors.rgb2hex(colormap(1))
-    
-    # Create a container for the max temperature input and color indicator
-    st.markdown(f"""
-    <div style="display: flex; align-items: center; margin-bottom: 5px;">
-        <div style="width: 20px; height: 20px; background-color: {max_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
-        <div style="font-weight: bold;">Max Temperature (°C)</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Ensure max_temp is at least min_temp
-    max_temp = st.number_input(
-        "",  # Empty label since we're using custom label above
-        value=max(current_max, min_temp),
-        min_value=min_temp,  # Enforce min_temp as the minimum allowed value
-        step=1.0,
-        help="Maximum temperature for color mapping.",
-        label_visibility="collapsed"  # Hide the default label
-    )
-    
-    # Update session state
-    session.max_temp = max_temp
-    if not st.session_state['max_temp_set'] and max_temp != max_data_temp:
-        st.session_state['max_temp_set'] = True
-
-# Add a note about the validation
-st.caption("Note: Maximum temperature must be greater than or equal to minimum temperature.")
+    # Add a note about the validation
+    st.caption("Note: Maximum temperature must be greater than or equal to minimum temperature.")
 
 def get_temperature_range(min_temp, max_temp, df):
     """
