@@ -586,23 +586,22 @@ def get_temperature_styles() -> str:
     .data-range-indicator {
         position: relative;
         height: 25px;
-        margin-top: -5px;
-        margin-bottom: 5px;
+        margin-top: 0px;
+        margin-bottom: 10px;
         width: 100%;
     }
     .tick-mark {
         position: absolute;
         width: 2px;
-        height: 8px;
-        background-color: rgba(255,255,255,0.9);
+        height: 10px;
+        background-color: rgba(255,255,255,0.7);
         transform: translateX(-50%);
     }
     .tick-label {
         position: absolute;
-        font-size: 12px;
-        color: rgba(255,255,255,0.9);
+        font-size: 10px;
         transform: translateX(-50%);
-        top: 8px;
+        top: 12px;
         white-space: nowrap;
         font-weight: bold;
     }
@@ -703,8 +702,25 @@ def render_data_range_indicators(
         data_min: Minimum temperature in the data
         data_max: Maximum temperature in the data
     """
-    # Data range indicators removed as per user request
-    pass
+    # Calculate positions for data min and max as percentages
+    slider_range = slider_max - slider_min
+    min_pos = ((data_min - slider_min) / slider_range) * 100
+    max_pos = ((data_max - slider_min) / slider_range) * 100
+    
+    # Create HTML for the data range indicators
+    html = f"""
+    <div class="data-range-indicator">
+        <div class="tick-mark" style="left: {min_pos}%;"></div>
+        <div class="tick-label" style="left: {min_pos}%; font-size: 10px; color: rgba(100,200,255,0.9);">
+            {data_min:.1f}°C<br><span style="font-size: 8px; opacity: 0.8;">data min</span>
+        </div>
+        <div class="tick-mark" style="left: {max_pos}%;"></div>
+        <div class="tick-label" style="left: {max_pos}%; font-size: 10px; color: rgba(255,100,0,0.9);">
+            {data_max:.1f}°C<br><span style="font-size: 8px; opacity: 0.8;">data max</span>
+        </div>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 def render_temperature_range_slider(
     session: SessionStateManager,
