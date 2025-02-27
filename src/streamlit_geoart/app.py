@@ -948,7 +948,12 @@ st.subheader("Input Controls")
 input_col1, input_col2 = st.columns(2)
 
 with input_col1:
-    new_address = st.text_input(label="Location", value=address, key="location")
+    new_address = st.text_input(
+        label="Location",
+        value=address,
+        key="location",
+        help="Enter an address (e.g., 'New York') or coordinates (e.g., '47.3769° N, 8.5417° E')"
+    )
 
 with input_col2:
     new_start_date = st.date_input("Start Date", value=start_date, min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
@@ -998,10 +1003,10 @@ with st.sidebar.expander("Temperature Settings", expanded=False):
 with st.sidebar.expander("Location", expanded=False):
     # Add location input field above the map
     sidebar_address = st.text_input(
-        label="Location",
+        label="",
         value=address,
         key="sidebar_location",
-        help="Enter a location to view on the map"
+        help="Enter an address (e.g., 'New York') or coordinates (e.g., '47.3769° N, 8.5417° E')"
     )
     
     # Update the map if the location changes
