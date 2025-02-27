@@ -157,9 +157,9 @@ def display_colormap_grid(colormap_categories, selected_category=None, key_prefi
                     col1, col2, col3 = st.columns([0.5, 1.5, 6])
                     
                     with col1:
-                        # Checkbox for selection
+                        # Checkbox for selection with proper label
                         is_selected = st.checkbox(
-                            "",
+                            f"Select {cmap_name}",
                             value=st.session_state[checkbox_key],
                             key=checkbox_key,
                             on_change=select_colormap,
@@ -175,16 +175,18 @@ def display_colormap_grid(colormap_categories, selected_category=None, key_prefi
                         # Display colormap preview
                         fig = create_colormap_preview(cmap_name)
                         st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+                        plt.close(fig)  # Close figure to prevent memory leaks
     
     return st.session_state[f"{key_prefix}_selected"]
 
-def colormap_selector(key_prefix="colormap", display_mode="grid"):
+def colormap_selector(key_prefix="colormap", display_mode="grid", use_expander=True):
     """
     Enhanced colormap selector that returns the selected colormap configuration.
     
     Parameters:
     - key_prefix: Prefix for session state keys to avoid conflicts
     - display_mode: 'grid' for grid display, 'single' for single preview
+    - use_expander: Whether to use an expander for the colormap grid (set to False when used inside another expander)
     
     Returns:
     - Dictionary with colormap configuration
@@ -207,9 +209,20 @@ def colormap_selector(key_prefix="colormap", display_mode="grid"):
     
     # Main area
     
-    # Create an expander for the colormap selection
-    with st.expander("Select a Colormap", expanded=False):
-        # Display colormap grid with all categories
+    # Display colormap grid - either in an expander or directly
+    if use_expander:
+        with st.expander("Select a Colormap", expanded=False):
+            selected_from_grid = display_colormap_grid(
+                all_categories,
+                key_prefix=f"{key_prefix}_grid"
+            )
+            
+            # Update selected colormap if a new one was selected from the grid
+            if selected_from_grid:
+                st.session_state[f"{key_prefix}_selected"] = selected_from_grid
+    else:
+        # Display directly without an expander
+        st.subheader("Select a Colormap")
         selected_from_grid = display_colormap_grid(
             all_categories,
             key_prefix=f"{key_prefix}_grid"
@@ -223,7 +236,7 @@ def colormap_selector(key_prefix="colormap", display_mode="grid"):
     selected_cmap = st.session_state[f"{key_prefix}_selected"]
     
     # Options for the selected colormap
-    reverse = st.checkbox("Reverse Colormap", value=st.session_state[f"{key_prefix}_reverse"], key=f"{key_prefix}_reverse_checkbox")
+    reverse = st.checkbox("Reverse Colormap", value=st.session_state[f"{key_prefix}_reverse"], key=f"{key_prefix}_reverse_checkbox", help="Invert the colormap direction")
     st.session_state[f"{key_prefix}_reverse"] = reverse
     
     # Get the display colormap name with _r suffix if reversed
@@ -233,6 +246,7 @@ def colormap_selector(key_prefix="colormap", display_mode="grid"):
     # Show preview of selected colormap with reverse option
     fig = create_colormap_preview(display_cmap)
     st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+    plt.close(fig)  # Close figure to prevent memory leaks
 
     # Return the selected configuration
     return {
@@ -376,7 +390,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
 st.title('GeoArt')
 
 st.write("""
@@ -387,9 +400,10 @@ st.write("""
 # Initialize or get existing session state
 session = SessionStateManager.from_session_state()
 
-form_col1, form_col2 = st.columns(2)
-address = form_col1.text_input(label="Location", key="location")
-start_date = form_col2.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
+# Move basic input controls to the sidebar
+st.sidebar.header("Input Controls")
+address = st.sidebar.text_input(label="Location", key="location")
+start_date = st.sidebar.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
 
 # Update computed fields
 session.end_date = start_date.replace(year=start_date.year + 1)
@@ -400,6 +414,118 @@ session.weather_data = get_weather_data(session.location_coordinates, session.st
 df = session.weather_data.hourly.to_dataframe()
 min_data_temp = float(df['temperature'].min())
 max_data_temp = float(df['temperature'].max())
+
+# Define helper functions first
+def get_temperature_range(min_temp, max_temp, df):
+    """
+    Calculate the applied temperature range without displaying a legend.
+    
+    Args:
+        min_temp: Minimum temperature value (or None to use data min)
+        max_temp: Maximum temperature value (or None to use data max)
+        df: DataFrame containing temperature data
+        
+    Returns:
+        tuple: (min_val, max_val) - The actual min/max values used for normalization
+    """
+    # Get the data range and the applied range
+    data_min = float(df['temperature'].min())
+    data_max = float(df['temperature'].max())
+    applied_min = min_temp if min_temp is not None else data_min
+    applied_max = max_temp if max_temp is not None else data_max
+    
+    return applied_min, applied_max
+
+# Create a temperature legend/colorbar
+def create_temperature_legend(cmap_name, min_temp, max_temp, width=600, height=15):
+    """Create a temperature legend with the current colormap"""
+    # Create figure with tight layout and no padding
+    fig, ax = plt.subplots(figsize=(width/100, height/100))
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)  # Remove padding
+    
+    # Create gradient
+    gradient = np.linspace(0, 1, width)
+    gradient = np.vstack((gradient, gradient))
+    
+    # Display gradient
+    ax.imshow(gradient, aspect='auto', cmap=cmap_name)
+    
+    # Remove axes and borders
+    ax.axis('off')
+    fig.patch.set_alpha(0)  # Make figure background transparent
+    
+    # Set tight layout with no padding
+    plt.tight_layout(pad=0)
+    
+    return fig
+
+# Initialize temperature range values
+if 'min_temp_set' not in st.session_state:
+    st.session_state['min_temp_set'] = False
+    if session.min_temp is None:
+        session.min_temp = min_data_temp
+
+if 'max_temp_set' not in st.session_state:
+    st.session_state['max_temp_set'] = False
+    if session.max_temp is None:
+        session.max_temp = max_data_temp
+
+# Initialize custom range limits
+data_range = max_data_temp - min_data_temp
+if 'custom_range_min' not in st.session_state:
+    st.session_state['custom_range_min'] = min_data_temp - (data_range * 0.5)
+if 'custom_range_max' not in st.session_state:
+    st.session_state['custom_range_max'] = max_data_temp + (data_range * 0.5)
+
+# Generate the visualization first (before customization controls)
+def get_image_wrapper():
+    cmap = session.style if hasattr(session, 'style') else "viridis"
+    session.image = get_image(session.weather_data, cmap, session.min_temp, session.max_temp)
+
+# Set default style if not already set
+if not hasattr(session, 'style') or session.style is None:
+    session.style = "viridis"
+
+# Generate the image
+get_image_wrapper()
+
+# Display the visualization prominently
+st.header("Temperature Visualization")
+st.image(session.image.get_image())
+
+# Get temperature range values for legend
+min_val, max_val = get_temperature_range(session.min_temp, session.max_temp, df)
+
+# Add temperature legend
+legend_fig = create_temperature_legend(
+    session.style,
+    min_val,
+    max_val,
+    width=600,
+    height=15
+)
+st.pyplot(legend_fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+plt.close(legend_fig)  # Close figure to prevent memory leaks
+
+# Add legend ticks
+legend_min = min_val
+legend_max = max_val
+legend_width = 100
+num_ticks = 5
+tick_temps = np.linspace(legend_min, legend_max, num_ticks)
+tick_positions = [0, 25, 50, 75, 100]
+
+tick_html = '<div class="legend-tick-container">'
+for i, (pos, temp) in enumerate(zip(tick_positions, tick_temps)):
+    tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
+    if i == 0:
+        tick_html += f'<div class="legend-tick-label" style="left: {pos+2}%; text-align: left;">{temp:.1f}°C</div>'
+    elif i == len(tick_positions) - 1:
+        tick_html += f'<div class="legend-tick-label" style="left: {pos-2}%; text-align: right;">{temp:.1f}°C</div>'
+    else:
+        tick_html += f'<div class="legend-tick-label" style="left: {pos}%;">{temp:.1f}°C</div>'
+tick_html += '</div>'
+st.markdown(tick_html, unsafe_allow_html=True)
 
 # Create a gradient bar visualization for temperature range selection
 @st.cache_data
@@ -468,85 +594,7 @@ def update_temp_range(values):
     else:
         st.session_state['max_temp_set'] = False
 
-# Temperature range controls
-# Use the enhanced colormap selector
-st.header("Colormap Selection")
-colormap_config = colormap_selector(key_prefix="main_colormap", display_mode="grid")
-
-# Update the style in session state
-if colormap_config['reverse']:
-    session.style = f"{colormap_config['colormap']}_r"
-else:
-    session.style = colormap_config['colormap']
-
-# Temperature range mapping section (now part of color selection)
-st.subheader("Temperature Range Mapping")
-st.info(f"Data temperature range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C")
-st.caption("Adjust the temperature range using the slider or input fields below to control the color mapping and enhance visualization.")
-
-# Initialize session state for tracking if min/max temp have been set
-if 'min_temp_set' not in st.session_state:
-    st.session_state['min_temp_set'] = False
-    # Initialize with data min on first load
-    if session.min_temp is None:
-        session.min_temp = min_data_temp
-
-if 'max_temp_set' not in st.session_state:
-    st.session_state['max_temp_set'] = False
-    # Initialize with data max on first load
-    if session.max_temp is None:
-        session.max_temp = max_data_temp
-
-# Initialize custom range limits with defaults if not set
-data_range = max_data_temp - min_data_temp
-if 'custom_range_min' not in st.session_state:
-    # Default to data range minus 50%
-    st.session_state['custom_range_min'] = min_data_temp - (data_range * 0.5)
-
-if 'custom_range_max' not in st.session_state:
-    # Default to data range plus 50%
-    st.session_state['custom_range_max'] = max_data_temp + (data_range * 0.5)
-
-# Store current values for validation
-current_min = float(session.min_temp)
-current_max = float(session.max_temp)
-
-# Create the visual temperature range selector
-st.write("### Visual Temperature Range Selector")
-
-# Get the current colormap
-try:
-    colormap = mpl.colormaps[session.style]
-except KeyError:
-    base_cmap = session.style.replace('_r', '')
-    colormap = mpl.colormaps[base_cmap].reversed()
-
-# No replacement needed - removing the duplicate expander
-
-# Calculate display range for gradient bar
-display_min = st.session_state['custom_range_min']
-display_max = st.session_state['custom_range_max']
-
-# Create the gradient bar visualization with appropriate range
-gradient_fig = create_temperature_gradient_bar(
-    session.style,
-    width=600,
-    height=30,  # Reduced from 40
-    min_temp=display_min,
-    max_temp=display_max
-)
-
-# Display the gradient bar
-st.pyplot(gradient_fig, use_container_width=True)
-
-# Set slider range to use custom range limits
-slider_min = float(st.session_state['custom_range_min'])
-slider_max = float(st.session_state['custom_range_max'])
-
-# Calculate appropriate step size
-slider_step = (slider_max - slider_min) / 100  # 100 steps across the range
-
-# Add custom CSS to reduce spacing between slider and indicators
+# Add CSS for slider and data range indicators
 st.markdown("""
 <style>
 /* Reduce bottom margin of slider container */
@@ -581,226 +629,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Create a slider with the current min/max values
-temp_range = st.slider(
-    "Temperature Range",
-    min_value=slider_min,
-    max_value=slider_max,
-    value=(current_min, current_max),
-    step=slider_step,
-    format="%.1f°C",
-    key="temp_range_slider",
-    help="Drag the handles to adjust the minimum and maximum temperature values for color mapping."
-)
-
-# Show data range indicators below the slider
-# Calculate positions as percentages of the slider width
-min_pos = (min_data_temp - slider_min) / (slider_max - slider_min) * 100
-max_pos = (max_data_temp - slider_min) / (slider_max - slider_min) * 100
-
-# Add the data range indicators with temperature values
-st.markdown(f"""
-<div class="data-range-indicator">
-    {f'<div class="tick-mark" style="left: {min_pos}%;"></div>' if 0 <= min_pos <= 100 else ''}
-    {f'<div class="tick-label" style="left: {min_pos}%;">Data Min: {min_data_temp:.1f}°C</div>' if 0 <= min_pos <= 100 else ''}
-    {f'<div class="tick-mark" style="left: {max_pos}%;"></div>' if 0 <= max_pos <= 100 else ''}
-    {f'<div class="tick-label" style="left: {max_pos}%;">Data Max: {max_data_temp:.1f}°C</div>' if 0 <= max_pos <= 100 else ''}
-</div>
-""", unsafe_allow_html=True)
-
-# Update session state based on slider values
-if temp_range != (current_min, current_max):
-    # Slider has changed
-    update_temp_range(temp_range)
-    # Force rerun to update the visualization
-    st.rerun()
-
-# Add advanced options in an expandable section
-with st.expander("Advanced Temperature Options", expanded=False):
-    st.write("#### Fine-tune Temperature Values")
-    st.caption("Adjust temperature values with precise inputs:")
-    
-    temp_input_col1, temp_input_col2 = st.columns(2)
-    
-    with temp_input_col1:
-        min_temp_input = st.number_input(
-            "Min Temperature (°C)",
-            value=temp_range[0],
-            min_value=slider_min,
-            max_value=temp_range[1] - slider_step,  # Ensure min < max
-            step=slider_step,
-            format="%.1f",
-            help="Minimum temperature for color mapping."
-        )
-    
-    with temp_input_col2:
-        max_temp_input = st.number_input(
-            "Max Temperature (°C)",
-            value=temp_range[1],
-            min_value=min_temp_input + slider_step,  # Ensure max > min
-            max_value=slider_max,
-            step=slider_step,
-            format="%.1f",
-            help="Maximum temperature for color mapping."
-        )
-    
-    # Update session state based on number inputs
-    if (min_temp_input, max_temp_input) != temp_range:
-        # Number inputs have changed
-        update_temp_range((min_temp_input, max_temp_input))
-        # Force rerun to update the visualization
-        st.rerun()
-    
-    st.write("#### Selectable Temperature Range")
-    st.caption("Define the minimum and maximum selectable temperature values for the slider.")
-    
-    # Create two columns for min/max inputs
-    custom_col1, custom_col2 = st.columns(2)
-    
-    with custom_col1:
-        # Input for minimum range limit
-        custom_min = st.number_input(
-            "Minimum Selectable Temperature (°C)",
-            value=float(st.session_state['custom_range_min']),
-            step=1.0,
-            help="The lowest temperature value that can be selected on the slider."
-        )
-        st.session_state['custom_range_min'] = custom_min
-    
-    with custom_col2:
-        # Input for maximum range limit
-        custom_max = st.number_input(
-            "Maximum Selectable Temperature (°C)",
-            value=float(st.session_state['custom_range_max']),
-            step=1.0,
-            help="The highest temperature value that can be selected on the slider."
-        )
-        st.session_state['custom_range_max'] = custom_max
-        
-        # Check if range values have changed and trigger rerun
-        if 'prev_custom_min' not in st.session_state or 'prev_custom_max' not in st.session_state or \
-           custom_min != st.session_state.get('prev_custom_min') or custom_max != st.session_state.get('prev_custom_max'):
-            st.session_state['prev_custom_min'] = custom_min
-            st.session_state['prev_custom_max'] = custom_max
-            st.rerun()
-    
-    # Validate that min < max
-    if custom_min >= custom_max:
-        st.error("Minimum range limit must be less than maximum range limit.")
-        # Reset to valid values
-        custom_min = min(custom_min, custom_max - 1)
-        custom_max = max(custom_max, custom_min + 1)
-        st.session_state['custom_range_min'] = custom_min
-        st.session_state['custom_range_max'] = custom_max
-        
-
-
-
-# Add reset button
-if st.button("Reset to Default Range", help="Resets to the full data range. This maximizes the use of all available colors across the entire data range."):
-    # Set the temperature values to the data range
-    session.min_temp = min_data_temp
-    session.max_temp = max_data_temp
-    # Reset the flags
-    st.session_state['min_temp_set'] = False
-    st.session_state['max_temp_set'] = False
-    # Force rerun with the new values
-    st.rerun()
-
-
-def get_temperature_range(min_temp, max_temp, df):
-    """
-    Calculate the applied temperature range without displaying a legend.
-    
-    Args:
-        min_temp: Minimum temperature value (or None to use data min)
-        max_temp: Maximum temperature value (or None to use data max)
-        df: DataFrame containing temperature data
-        
-    Returns:
-        tuple: (min_val, max_val) - The actual min/max values used for normalization
-    """
-    # Get the data range and the applied range
-    data_min = float(df['temperature'].min())
-    data_max = float(df['temperature'].max())
-    applied_min = min_temp if min_temp is not None else data_min
-    applied_max = max_temp if max_temp is not None else data_max
-    
-    return applied_min, applied_max
-
-# Get the temperature range values
-min_val, max_val = get_temperature_range(session.min_temp, session.max_temp, df)
-
-# Add explanation of color mapping
-if st.session_state.get('min_temp_set', False) or st.session_state.get('max_temp_set', False):
-    st.info(f"""
-    **Custom Contrast Mapping Applied:**
-    - Full data range: {df['temperature'].min():.1f}°C to {df['temperature'].max():.1f}°C
-    - Current mapping range: {min_val:.1f}°C to {max_val:.1f}°C
-    
-    Values outside this range will be clipped to the min/max colors, enhancing contrast within the selected range.
-    """)
-else:
-    pass
-
-def get_image_wrapper():
-    # Apply colormap with reverse option if selected
-    cmap = session.style
-    session.image = get_image(session.weather_data, cmap, session.min_temp, session.max_temp)
-
-# Generate the image with the selected colormap
-get_image_wrapper()
-
-# Create a temperature legend/colorbar
-def create_temperature_legend(cmap_name, min_temp, max_temp, width=600, height=15):  # Reduced height to match colormap preview
-    """Create a temperature legend with the current colormap"""
-    # Create figure with tight layout and no padding
-    fig, ax = plt.subplots(figsize=(width/100, height/100))
-    plt.subplots_adjust(left=0, right=1, bottom=0, top=1)  # Remove padding
-    
-    # Create gradient
-    gradient = np.linspace(0, 1, width)
-    gradient = np.vstack((gradient, gradient))
-    
-    # Display gradient
-    ax.imshow(gradient, aspect='auto', cmap=cmap_name)
-    
-    # Remove axes and borders
-    ax.axis('off')
-    fig.patch.set_alpha(0)  # Make figure background transparent
-    
-    # Set tight layout with no padding
-    plt.tight_layout(pad=0)
-    
-    return fig
-
-# Display the generated image
-st.header("Generated Temperature Visualization")
-st.image(session.image.get_image())
-
-# Add temperature legend (without title)
-legend_fig = create_temperature_legend(
-    session.style,
-    min_val,  # Use the applied min temperature
-    max_val,  # Use the applied max temperature
-    width=600,
-    height=15
-)
-st.pyplot(legend_fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
-
-
-# Add custom temperature ticks below the legend
-# Calculate positions as percentages of the width
-legend_min = min_val
-legend_max = max_val
-legend_width = 100  # percentage width
-
-# Create evenly spaced ticks
-num_ticks = 5
-tick_temps = np.linspace(legend_min, legend_max, num_ticks)
-tick_positions = np.linspace(0, legend_width, num_ticks)
-
-# Add CSS for the ticks if not already added
+# Add CSS for the ticks
 st.markdown("""
 <style>
 .legend-tick-container {
@@ -857,45 +686,232 @@ tick_html += '</div>'
 # Display the ticks
 st.markdown(tick_html, unsafe_allow_html=True)
 
-# Add a section for temperature statistics
-st.header("Temperature Statistics")
-st.markdown("Key temperature data points for the selected time period.")
+# Split visualization settings into multiple expandable sections in the sidebar
 
-col1, col2, col3 = st.columns(3)
+# 1. Colormap Selection
+with st.sidebar.expander("Colormap Selection", expanded=False):
+    colormap_config = colormap_selector(key_prefix="main_colormap", display_mode="grid", use_expander=False)
+    
+    # Update the style in session state
+    if colormap_config['reverse']:
+        session.style = f"{colormap_config['colormap']}_r"
+    else:
+        session.style = colormap_config['colormap']
 
-# Find indices of maximum and minimum temperatures
-max_temp_index = df['temperature'].idxmax()
-min_temp_index = df['temperature'].idxmin()
+# 2. Combined Temperature Settings
+with st.sidebar.expander("Temperature Settings", expanded=False):
+    # Temperature Range section
+    st.subheader("Temperature Range")
+    st.info(f"Data temperature range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C")
+    st.caption("Adjust the temperature range using the slider to control the color mapping and enhance visualization.")
+    
+    # Get the current colormap
+    try:
+        colormap = mpl.colormaps[session.style]
+    except KeyError:
+        base_cmap = session.style.replace('_r', '')
+        colormap = mpl.colormaps[base_cmap].reversed()
+    
+    # Calculate display range for gradient bar
+    display_min = st.session_state['custom_range_min']
+    display_max = st.session_state['custom_range_max']
+    
+    # Create the gradient bar visualization with appropriate range
+    gradient_fig = create_temperature_gradient_bar(
+        session.style,
+        width=600,
+        height=30,
+        min_temp=display_min,
+        max_temp=display_max
+    )
+    
+    # Display the gradient bar
+    st.pyplot(gradient_fig, use_container_width=True)
+    plt.close(gradient_fig)  # Close figure to prevent memory leaks
+    
+    # Set slider range to use custom range limits
+    slider_min = float(st.session_state['custom_range_min'])
+    slider_max = float(st.session_state['custom_range_max'])
+    
+    # Calculate appropriate step size
+    slider_step = (slider_max - slider_min) / 100  # 100 steps across the range
+    
+    # Store current values for validation
+    current_min = float(session.min_temp)
+    current_max = float(session.max_temp)
+    
+    # Create a slider with the current min/max values
+    temp_range = st.slider(
+        "Temperature Range",
+        min_value=slider_min,
+        max_value=slider_max,
+        value=(current_min, current_max),
+        step=slider_step,
+        format="%.1f°C",
+        key="temp_range_slider",
+        help="Drag the handles to adjust the minimum and maximum temperature values for color mapping."
+    )
+    
+    # Show data range indicators below the slider
+    # Calculate positions as percentages of the slider width
+    min_pos = (min_data_temp - slider_min) / (slider_max - slider_min) * 100
+    max_pos = (max_data_temp - slider_min) / (slider_max - slider_min) * 100
+    
+    # Add the data range indicators with temperature values
+    st.markdown(f"""
+    <div class="data-range-indicator">
+        {f'<div class="tick-mark" style="left: {min_pos}%;"></div>' if 0 <= min_pos <= 100 else ''}
+        {f'<div class="tick-label" style="left: {min_pos}%;">Data Min: {min_data_temp:.1f}°C</div>' if 0 <= min_pos <= 100 else ''}
+        {f'<div class="tick-mark" style="left: {max_pos}%;"></div>' if 0 <= max_pos <= 100 else ''}
+        {f'<div class="tick-label" style="left: {max_pos}%;">Data Max: {max_data_temp:.1f}°C</div>' if 0 <= max_pos <= 100 else ''}
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Update session state based on slider values
+    if temp_range != (current_min, current_max):
+        # Slider has changed
+        update_temp_range(temp_range)
+        # Force rerun to update the visualization
+        st.rerun()
+    
+    # Add explanation of color mapping
+    if st.session_state.get('min_temp_set', False) or st.session_state.get('max_temp_set', False):
+        st.info(f"""
+        **Custom Contrast Mapping Applied:**
+        - Full data range: {df['temperature'].min():.1f}°C to {df['temperature'].max():.1f}°C
+        - Current mapping range: {min_val:.1f}°C to {max_val:.1f}°C
+        
+        Values outside this range will be clipped to the min/max colors, enhancing contrast within the selected range.
+        """)
+    
+    # Fine-tune temperature values section
+    st.subheader("Fine-tune Temperature Values")
+    st.caption("Adjust temperature values with precise inputs:")
+    
+    temp_input_col1, temp_input_col2 = st.columns(2)
+    
+    with temp_input_col1:
+        min_temp_input = st.number_input(
+            "Min Temperature (°C)",
+            value=temp_range[0],
+            min_value=slider_min,
+            max_value=temp_range[1] - slider_step,  # Ensure min < max
+            step=slider_step,
+            format="%.1f",
+            help="Minimum temperature for color mapping."
+        )
+    
+    with temp_input_col2:
+        max_temp_input = st.number_input(
+            "Max Temperature (°C)",
+            value=temp_range[1],
+            min_value=min_temp_input + slider_step,  # Ensure max > min
+            max_value=slider_max,
+            step=slider_step,
+            format="%.1f",
+            help="Maximum temperature for color mapping."
+        )
+    
+    # Update session state based on number inputs
+    if (min_temp_input, max_temp_input) != temp_range:
+        # Number inputs have changed
+        update_temp_range((min_temp_input, max_temp_input))
+        # Force rerun to update the visualization
+        st.rerun()
+    
+    # Advanced settings section
+    st.subheader("Advanced Settings")
+    st.caption("Define the minimum and maximum selectable temperature values for the slider.")
+    
+    # Create two columns for min/max inputs
+    custom_col1, custom_col2 = st.columns(2)
+    
+    with custom_col1:
+        # Input for minimum range limit
+        custom_min = st.number_input(
+            "Minimum Selectable Temperature (°C)",
+            value=float(st.session_state['custom_range_min']),
+            step=1.0,
+            help="The lowest temperature value that can be selected on the slider."
+        )
+        st.session_state['custom_range_min'] = custom_min
+    
+    with custom_col2:
+        # Input for maximum range limit
+        custom_max = st.number_input(
+            "Maximum Selectable Temperature (°C)",
+            value=float(st.session_state['custom_range_max']),
+            step=1.0,
+            help="The highest temperature value that can be selected on the slider."
+        )
+        st.session_state['custom_range_max'] = custom_max
+        
+        # Check if range values have changed and trigger rerun
+        if 'prev_custom_min' not in st.session_state or 'prev_custom_max' not in st.session_state or \
+           custom_min != st.session_state.get('prev_custom_min') or custom_max != st.session_state.get('prev_custom_max'):
+            st.session_state['prev_custom_min'] = custom_min
+            st.session_state['prev_custom_max'] = custom_max
+            st.rerun()
+    
+    # Validate that min < max
+    if custom_min >= custom_max:
+        st.error("Minimum range limit must be less than maximum range limit.")
+        # Reset to valid values
+        custom_min = min(custom_min, custom_max - 1)
+        custom_max = max(custom_max, custom_min + 1)
+        st.session_state['custom_range_min'] = custom_min
+        st.session_state['custom_range_max'] = custom_max
+    
+    # Add reset button
+    if st.button("Reset to Default Range", help="Resets to the full data range. This maximizes the use of all available colors across the entire data range."):
+        # Set the temperature values to the data range
+        session.min_temp = min_data_temp
+        session.max_temp = max_data_temp
+        # Reset the flags
+        st.session_state['min_temp_set'] = False
+        st.session_state['max_temp_set'] = False
+        # Force rerun with the new values
+        st.rerun()
 
-with col1:
-    st.markdown("##### Max. Temperature")
-    max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
-    max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
-    st.metric(label=max_time_str, value=max_temp_str, border=False)
+# Add a section for temperature statistics in the sidebar
+with st.sidebar.expander("Temperature Statistics", expanded=False):
+    st.markdown("Key temperature data points for the selected time period.")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    # Find indices of maximum and minimum temperatures
+    max_temp_index = df['temperature'].idxmax()
+    min_temp_index = df['temperature'].idxmin()
+    
+    with col1:
+        st.markdown("##### Max. Temperature")
+        max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+        max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
+        st.metric(label=max_time_str, value=max_temp_str, border=False)
+    
+    with col2:
+        st.markdown("##### Min. Temperature")
+        min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+        min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
+        st.metric(label=min_time_str, value=min_temp_str, border=False)
+    
+    with col3:
+        st.markdown("##### Mean Temperature")
+        mean_temp_str = f"{df['temperature'].mean().round()} °C"
+        st.metric(label="Mean Temperature", value=mean_temp_str)
 
-with col2:
-    st.markdown("##### Min. Temperature")
-    min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
-    min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
-    st.metric(label=min_time_str, value=min_temp_str, border=False)
-
-with col3:
-    st.markdown("##### Mean Temperature")
-    mean_temp_str = f"{df['temperature'].mean().round()} °C"
-    st.metric(label="Mean", label_visibility="hidden", value=mean_temp_str)
-
-# Add a map section showing the location
-st.header("Location Map")
-st.caption(f"Map showing the selected location: {address}")
-
-# Create a DataFrame with the location coordinates for the map
-import pandas as pd
-map_data = pd.DataFrame({
-    'lat': [session.location_coordinates.latitude],
-    'lon': [session.location_coordinates.longitude]
-})
-
-# Display the map with the location
-st.map(data=map_data, zoom=10, use_container_width=True)
+# Add a map section showing the location in the sidebar
+with st.sidebar.expander("Location Map", expanded=False):
+    st.caption(f"Map showing the selected location: {address}")
+    
+    # Create a DataFrame with the location coordinates for the map
+    import pandas as pd
+    map_data = pd.DataFrame({
+        'lat': [session.location_coordinates.latitude],
+        'lon': [session.location_coordinates.longitude]
+    })
+    
+    # Display the map with the location
+    st.map(data=map_data, zoom=10, use_container_width=True)
 
 
