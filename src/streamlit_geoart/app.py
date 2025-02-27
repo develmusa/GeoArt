@@ -863,7 +863,7 @@ with st.sidebar.expander("Temperature Settings", expanded=False):
         st.session_state['custom_range_max'] = custom_max
     
     # Add reset button
-    if st.button("Reset to Default Range", help="Resets to the full data range. This maximizes the use of all available colors across the entire data range."):
+    if st.button("Reset to Default Range", key="reset_temp_range_button", help="Resets to the full data range. This maximizes the use of all available colors across the entire data range."):
         # Set the temperature values to the data range
         session.min_temp = min_data_temp
         session.max_temp = max_data_temp
