@@ -433,15 +433,9 @@ st.write("""
 # Initialize or get existing session state
 session = SessionStateManager.from_session_state()
 
-# Add input controls to the main content area
-st.subheader("Input Controls")
-col1, col2 = st.columns(2)
-
-with col1:
-    address = st.text_input(label="Location", key="location")
-
-with col2:
-    start_date = st.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
+# Get initial values for location and start date from session state
+address = session.location
+start_date = session.start_date
 
 # Update computed fields
 session.end_date = start_date.replace(year=start_date.year + 1)
@@ -947,32 +941,23 @@ def render_temperature_settings(
     # Render advanced settings
     render_advanced_settings(session, min_data_temp, max_data_temp)
 
-# Create HTML for the ticks with a middle tick
-num_ticks = 5  # Increased to 5 to add middle tick
-tick_temps = np.linspace(legend_min, legend_max, num_ticks)
+# Ticks are already displayed with the legend
 
-# Position ticks to match the legend edges with a middle tick
-tick_positions = [0, 25, 50, 75, 100]  # Evenly distributed with middle tick
+# Add input controls below the legend but before temperature statistics
+st.subheader("Input Controls")
+input_col1, input_col2 = st.columns(2)
 
-tick_html = '<div class="legend-tick-container">'
-for i, (pos, temp) in enumerate(zip(tick_positions, tick_temps)):
-    # Keep all tick marks at their correct positions
-    tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
-    
-    # Add special alignment for edge labels only
-    if i == 0:  # First tick
-        tick_html += f'<div class="legend-tick-label" style="left: {pos+2}%; text-align: left;">{temp:.1f}°C</div>'
-    elif i == len(tick_positions) - 1:  # Last tick
-        tick_html += f'<div class="legend-tick-label" style="left: {pos-2}%; text-align: right;">{temp:.1f}°C</div>'
-    else:  # Middle ticks
-        tick_html += f'<div class="legend-tick-label" style="left: {pos}%;">{temp:.1f}°C</div>'
+with input_col1:
+    new_address = st.text_input(label="Location", value=address, key="location")
 
-tick_html += '</div>'
+with input_col2:
+    new_start_date = st.date_input("Start Date", value=start_date, min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
 
-# Display the ticks
-st.markdown(tick_html, unsafe_allow_html=True)
+# Check if inputs have changed and trigger a rerun if needed
+if new_address != address or new_start_date != start_date:
+    st.rerun()
 
-# Add temperature statistics below the legend
+# Add temperature statistics below the input controls
 stat_col1, stat_col2 = st.columns(2)
 
 # Find indices of maximum and minimum temperatures
@@ -980,16 +965,16 @@ max_temp_index = df['temperature'].idxmax()
 min_temp_index = df['temperature'].idxmin()
 
 with stat_col1:
-    st.markdown("##### Max. Temperature")
-    max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
-    max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
-    st.metric(label=max_time_str, value=max_temp_str, border=False)
-
-with stat_col2:
     st.markdown("##### Min. Temperature")
     min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
     min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
     st.metric(label=min_time_str, value=min_temp_str, border=False)
+
+with stat_col2:
+    st.markdown("##### Max. Temperature")
+    max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+    max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
+    st.metric(label=max_time_str, value=max_temp_str, border=False)
 
 # Split visualization settings into multiple expandable sections in the sidebar
 
@@ -1009,9 +994,19 @@ with st.sidebar.expander("Colormap Selection", expanded=False):
 with st.sidebar.expander("Temperature Settings", expanded=False):
     render_temperature_settings(session, min_data_temp, max_data_temp, df)
 
-# Add location map in the sidebar
-with st.sidebar.expander("Location Map", expanded=False):
-    st.caption(f"Map showing the selected location: {address}")
+# Add location section in the sidebar
+with st.sidebar.expander("Location", expanded=False):
+    # Add location input field above the map
+    sidebar_address = st.text_input(
+        label="Location",
+        value=address,
+        key="sidebar_location",
+        help="Enter a location to view on the map"
+    )
+    
+    # Update the map if the location changes
+    if sidebar_address != address:
+        st.rerun()
     
     # Create a DataFrame with the location coordinates for the map
     import pandas as pd
