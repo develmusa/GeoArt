@@ -778,8 +778,7 @@ def create_temperature_legend(cmap_name, min_temp, max_temp, width=600, height=1
 st.header("Generated Temperature Visualization")
 st.image(session.image.get_image())
 
-# Add temperature legend
-st.subheader("Temperature Legend")
+# Add temperature legend (without title)
 legend_fig = create_temperature_legend(
     session.style,
     min_val,  # Use the applied min temperature
@@ -807,7 +806,7 @@ st.markdown("""
 .legend-tick-container {
     position: relative;
     height: 30px;
-    margin-top: -5px;
+    margin-top: -15px;  /* Increased negative margin to move ticks closer to legend */
     width: 100%;
     max-width: 100%;
     overflow: visible;
@@ -826,7 +825,7 @@ st.markdown("""
     font-size: 12px;
     color: rgba(255,255,255,0.9);
     transform: translateX(-50%);
-    top: 8px;
+    top: 5px;  /* Reduced from 8px to keep labels closer to tick marks */
     white-space: nowrap;
     font-weight: bold;
 }
@@ -842,22 +841,25 @@ tick_positions = [0, 25, 50, 75, 100]  # Evenly distributed with middle tick
 
 tick_html = '<div class="legend-tick-container">'
 for i, (pos, temp) in enumerate(zip(tick_positions, tick_temps)):
-    # Add special alignment and positioning for edge ticks
+    # Keep all tick marks at their correct positions
+    tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
+    
+    # Add special alignment for edge labels only
     if i == 0:  # First tick
-        tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
         tick_html += f'<div class="legend-tick-label" style="left: {pos+2}%; text-align: left;">{temp:.1f}°C</div>'
     elif i == len(tick_positions) - 1:  # Last tick
-        tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
         tick_html += f'<div class="legend-tick-label" style="left: {pos-2}%; text-align: right;">{temp:.1f}°C</div>'
     else:  # Middle ticks
-        tick_html += f'<div class="legend-tick-mark" style="left: {pos}%;"></div>'
         tick_html += f'<div class="legend-tick-label" style="left: {pos}%;">{temp:.1f}°C</div>'
+
 tick_html += '</div>'
 
 # Display the ticks
 st.markdown(tick_html, unsafe_allow_html=True)
 
-# This section has been moved to the color selection area
+# Add a section for temperature statistics
+st.header("Temperature Statistics")
+st.markdown("Key temperature data points for the selected time period.")
 
 col1, col2, col3 = st.columns(3)
 
@@ -882,5 +884,18 @@ with col3:
     mean_temp_str = f"{df['temperature'].mean().round()} °C"
     st.metric(label="Mean", label_visibility="hidden", value=mean_temp_str)
 
-    # map_data = pd.DataFrame([st.session_state.process_data.location_coordinates.model_dump()])
-    # st.map(data=map_data, zoom=10, use_container_width=True)
+# Add a map section showing the location
+st.header("Location Map")
+st.caption(f"Map showing the selected location: {address}")
+
+# Create a DataFrame with the location coordinates for the map
+import pandas as pd
+map_data = pd.DataFrame({
+    'lat': [session.location_coordinates.latitude],
+    'lon': [session.location_coordinates.longitude]
+})
+
+# Display the map with the location
+st.map(data=map_data, zoom=10, use_container_width=True)
+
+
