@@ -343,9 +343,9 @@ min_data_temp = float(df['temperature'].min())
 max_data_temp = float(df['temperature'].max())
 
 # Temperature range controls
-st.header("Temperature Range")
+st.header("Temperature Range Mapping")
 st.info(f"Data temperature range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C")
-st.caption("Adjust min/max temperature values to control the color mapping range.")
+st.caption("Adjust min/max temperature values to control the color mapping range and enhance visualization.")
 
 # Initialize session state for tracking if min/max temp have been set
 if 'min_temp_set' not in st.session_state:
@@ -359,17 +359,44 @@ if 'max_temp_set' not in st.session_state:
     # Initialize with data max on first load
     if session.max_temp is None:
         session.max_temp = max_data_temp
+# Add explanations for contrast operations
+st.markdown("""
+**Contrast Operations:**
+- **Contrast Stretching**: Maps the full temperature range to the full color range, showing the complete data distribution.
+- **Enhance Contrast**: Narrows the mapping range by 10% from each end, enhancing visibility of mid-range temperatures.
+""")
 
-# Add a button to reset to data range
-if st.button("Reset to Data Range"):
-    # Set the temperature values to the data range
-    session.min_temp = min_data_temp
-    session.max_temp = max_data_temp
-    # Reset the flags
-    st.session_state['min_temp_set'] = False
-    st.session_state['max_temp_set'] = False
-    # Force rerun with the new values
-    st.rerun()
+# Add buttons for common operations
+col1, col2 = st.columns(2)
+with col1:
+    # Add a button for contrast stretching (reset to data range)
+    if st.button("Apply Contrast Stretching", help="Maps the full temperature range to the full color range. This maximizes the use of all available colors across the entire data range."):
+        # Set the temperature values to the data range
+        session.min_temp = min_data_temp
+        session.max_temp = max_data_temp
+        # Reset the flags
+        st.session_state['min_temp_set'] = False
+        st.session_state['max_temp_set'] = False
+        # Force rerun with the new values
+        st.rerun()
+        
+with col2:
+    # Add a button for enhancing contrast with a narrower range
+    if st.button("Enhance Contrast", help="Narrows the mapping range by 10% from each end. This increases contrast in the middle range where most temperature values typically fall."):
+        # Calculate a narrower range (e.g., 10% in from each end)
+        range_size = max_data_temp - min_data_temp
+        enhanced_min = min_data_temp + (range_size * 0.1)
+        enhanced_max = max_data_temp - (range_size * 0.1)
+        
+        # Set the temperature values to the enhanced range
+        session.min_temp = enhanced_min
+        session.max_temp = enhanced_max
+        # Set the flags
+        st.session_state['min_temp_set'] = True
+        st.session_state['max_temp_set'] = True
+        # Force rerun with the new values
+        st.rerun()
+        st.rerun()
 
 # Store current values for validation
 current_min = float(session.min_temp)
@@ -461,14 +488,14 @@ st.pyplot(fig)
 # Add explanation of color mapping
 if st.session_state.get('min_temp_set', False) or st.session_state.get('max_temp_set', False):
     st.info(f"""
-    **Custom Color Mapping Applied:**
-    - Data temperature range: {df['temperature'].min():.1f}°C to {df['temperature'].max():.1f}°C
-    - Color mapping range: {min_val:.1f}°C to {max_val:.1f}°C
+    **Custom Contrast Mapping Applied:**
+    - Full data range: {df['temperature'].min():.1f}°C to {df['temperature'].max():.1f}°C
+    - Current mapping range: {min_val:.1f}°C to {max_val:.1f}°C
     
-    Values outside this range will be clipped to the min/max colors.
+    Values outside this range will be clipped to the min/max colors, enhancing contrast within the selected range.
     """)
 else:
-    st.caption("Color mapping uses the full data temperature range. Adjust the min/max temperature controls to customize.")
+    st.caption("Full contrast stretching applied (using entire data range). Use the temperature controls above to enhance specific ranges.")
 
 col1, col2, col3 = st.columns(3)
 
