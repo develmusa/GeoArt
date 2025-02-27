@@ -433,10 +433,15 @@ st.write("""
 # Initialize or get existing session state
 session = SessionStateManager.from_session_state()
 
-# Move basic input controls to the sidebar
-st.sidebar.header("Input Controls")
-address = st.sidebar.text_input(label="Location", key="location")
-start_date = st.sidebar.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
+# Add input controls to the main content area
+st.subheader("Input Controls")
+col1, col2 = st.columns(2)
+
+with col1:
+    address = st.text_input(label="Location", key="location")
+
+with col2:
+    start_date = st.date_input("Start Date", min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
 
 # Update computed fields
 session.end_date = start_date.replace(year=start_date.year + 1)
@@ -905,6 +910,8 @@ def render_temperature_settings(
     slider_max = float(session.custom_range_max)
     slider_step = (slider_max - slider_min) / 100  # 100 steps across the range
     
+    # Temperature information display removed as per user request
+    
     # Render temperature range slider
     temp_range = render_temperature_range_slider(session, min_data_temp, max_data_temp)
     
@@ -949,6 +956,25 @@ tick_html += '</div>'
 # Display the ticks
 st.markdown(tick_html, unsafe_allow_html=True)
 
+# Add temperature statistics below the legend
+stat_col1, stat_col2 = st.columns(2)
+
+# Find indices of maximum and minimum temperatures
+max_temp_index = df['temperature'].idxmax()
+min_temp_index = df['temperature'].idxmin()
+
+with stat_col1:
+    st.markdown("##### Max. Temperature")
+    max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+    max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
+    st.metric(label=max_time_str, value=max_temp_str, border=False)
+
+with stat_col2:
+    st.markdown("##### Min. Temperature")
+    min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+    min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
+    st.metric(label=min_time_str, value=min_temp_str, border=False)
+
 # Split visualization settings into multiple expandable sections in the sidebar
 
 # 1. Colormap Selection
@@ -967,34 +993,7 @@ with st.sidebar.expander("Colormap Selection", expanded=False):
 with st.sidebar.expander("Temperature Settings", expanded=False):
     render_temperature_settings(session, min_data_temp, max_data_temp, df)
 
-# Add a section for temperature statistics in the sidebar
-with st.sidebar.expander("Temperature Statistics", expanded=False):
-    st.markdown("Key temperature data points for the selected time period.")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    # Find indices of maximum and minimum temperatures
-    max_temp_index = df['temperature'].idxmax()
-    min_temp_index = df['temperature'].idxmin()
-    
-    with col1:
-        st.markdown("##### Max. Temperature")
-        max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
-        max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
-        st.metric(label=max_time_str, value=max_temp_str, border=False)
-    
-    with col2:
-        st.markdown("##### Min. Temperature")
-        min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
-        min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
-        st.metric(label=min_time_str, value=min_temp_str, border=False)
-    
-    with col3:
-        st.markdown("##### Mean Temperature")
-        mean_temp_str = f"{df['temperature'].mean().round()} °C"
-        st.metric(label="Mean Temperature", value=mean_temp_str)
-
-# Add a map section showing the location in the sidebar
+# Add location map in the sidebar
 with st.sidebar.expander("Location Map", expanded=False):
     st.caption(f"Map showing the selected location: {address}")
     
