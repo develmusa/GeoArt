@@ -956,7 +956,13 @@ with input_col1:
     )
 
 with input_col2:
-    new_start_date = st.date_input("Start Date", value=start_date, min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
+    new_start_date = st.date_input(
+        "Start Date",
+        value=start_date,
+        min_value=datetime.date(1940, 1, 1),
+        max_value=datetime.datetime.now() - datetime.timedelta(days=366),
+        key="start_date"
+    )
 
 # Check if inputs have changed and trigger a rerun if needed
 if new_address != address or new_start_date != start_date:
@@ -1019,8 +1025,28 @@ with st.sidebar.expander("Location", expanded=False):
         'lat': [session.location_coordinates.latitude],
         'lon': [session.location_coordinates.longitude]
     })
-    
     # Display the map with the location
     st.map(data=map_data, zoom=10, use_container_width=True)
 
+# Add time and date settings in the sidebar
+with st.sidebar.expander("Time and Date Settings", expanded=False):
+    st.subheader("Date Range")
+    
+    # Date input for start date
+    new_start_date = st.date_input(
+        "Start Date",
+        value=start_date,
+        min_value=datetime.date(1940, 1, 1),
+        max_value=datetime.datetime.now() - datetime.timedelta(days=366),
+        key="sidebar_start_date",
+        help="Select the start date for the temperature data (one year of data will be shown)"
+    )
+    
+    # Display the end date (read-only)
+    end_date = new_start_date.replace(year=new_start_date.year + 1)
+    st.info(f"End Date: {end_date.strftime('%Y-%m-%d')} (one year period)")
+    
+    # Check if date has changed and trigger a rerun if needed
+    if new_start_date != start_date:
+        st.rerun()
 
