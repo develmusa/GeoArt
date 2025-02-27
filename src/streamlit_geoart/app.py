@@ -366,7 +366,7 @@ def get_image(weather_data: WeatherData, color_map: str, min_temp: float = None,
 
 
 st.set_page_config(
-    page_title="GeoArt", page_icon="🗺️", initial_sidebar_state="expanded"
+    page_title="Annual Temperature Progression", page_icon="🗺️", initial_sidebar_state="expanded"
 )
 
 # Function to get color for a temperature value
@@ -423,13 +423,8 @@ st.markdown("""
     /* Number input styling removed as per user request */
 </style>
 """, unsafe_allow_html=True)
-st.title('GeoArt')
+st.title('Annual Temperature Progression')
 
-st.write("""
-    # One Year Temperature
-    This app generates a temperature map for a given location of a year.
-    The map is generated using the OpenWeatherMap API.
-    """)
 # Initialize or get existing session state
 session = SessionStateManager.from_session_state()
 
@@ -507,20 +502,19 @@ if session.custom_range_min == -20.0 and session.custom_range_max == 60.0:
     session.custom_range_min = min_data_temp - (data_range * 0.5)
     session.custom_range_max = max_data_temp + (data_range * 0.5)
 
+# Set default style if not already set
+if not hasattr(session, 'style') or session.style is None:
+    session.style = "viridis"
+
 # Generate the visualization first (before customization controls)
 def get_image_wrapper():
     cmap = session.style if hasattr(session, 'style') else "viridis"
     session.image = get_image(session.weather_data, cmap, session.min_temp, session.max_temp)
 
-# Set default style if not already set
-if not hasattr(session, 'style') or session.style is None:
-    session.style = "viridis"
-
 # Generate the image
 get_image_wrapper()
 
-# Display the visualization prominently
-st.header("Temperature Visualization")
+# Display the visualization immediately after the title
 st.image(session.image.get_image())
 
 # Get temperature range values for legend
@@ -556,6 +550,76 @@ for i, (pos, temp) in enumerate(zip(tick_positions, tick_temps)):
         tick_html += f'<div class="legend-tick-label" style="left: {pos}%;">{temp:.1f}°C</div>'
 tick_html += '</div>'
 st.markdown(tick_html, unsafe_allow_html=True)
+
+# Add input controls before the tabs
+input_col1, input_col2 = st.columns(2)
+
+with input_col1:
+    new_address = st.text_input(
+        label="Location",
+        value=address,
+        key="location",
+        help="Enter an address (e.g., 'New York') or coordinates (e.g., '47.3769° N, 8.5417° E')"
+    )
+
+with input_col2:
+    new_start_date = st.date_input("Start Date", value=start_date, min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
+
+# Check if inputs have changed and trigger a rerun if needed
+if new_address != address or new_start_date != start_date:
+    st.rerun()
+
+# Create tabs for description, usage instructions, and technical details
+description_tab, usage_tab, technical_tab = st.tabs(["Description", "How to Use", "Technical Details"])
+
+with description_tab:
+    st.markdown("""
+    ### Annual Temperature Visualization
+    
+    This visualization shows temperature patterns throughout the year for a selected location. The heatmap displays:
+    
+    - **Horizontal axis**: Time of day (00:00 to 23:00)
+    - **Vertical axis**: Day of the year (January to December)
+    - **Color**: Temperature values
+    
+    Explore seasonal patterns, daily temperature cycles, and extreme weather events at your selected location.
+    """)
+
+with usage_tab:
+    st.markdown("""
+    ### How to Use This Visualization
+    
+    1. **View the visualization**: The main heatmap shows temperature patterns over time
+    2. **Change location**: Enter a city or address in the "Location" field below
+    3. **Select different year**: Use the "Start Date" picker to choose a different year
+    4. **Customize colors**: Use the "Colormap Selection" in the sidebar to change the color scheme
+    5. **Adjust temperature range**: Fine-tune the temperature scale using the controls in the sidebar
+    
+    The color legend shows the temperature scale used in the visualization.
+    """)
+
+with technical_tab:
+    st.markdown("""
+    ### Data and Visualization Details
+    
+    This heatmap is generated using hourly temperature data for a full year:
+    
+    - **Data source**: Historical weather data from OpenWeatherMap API
+    - **Resolution**: Hourly temperature readings (8,760 data points per year)
+    - **Color mapping**: Temperature values are mapped to colors using the selected colormap
+    - **Temperature range**: By default, uses the actual min/max temperatures in the data
+    
+    ### Interpreting Patterns
+    
+    Different patterns in the visualization reveal different climate characteristics:
+    
+    - **Horizontal bands**: Show daily temperature cycles (warmer during day, cooler at night)
+    - **Vertical progression**: Reveals seasonal changes throughout the year
+    - **Bright/dark spots**: Indicate unusually hot or cold periods
+    - **Gradient changes**: Show how rapidly temperatures change during different seasons
+    """)
+
+# Visualization is already displayed above
 
 # This function has been replaced by render_temperature_gradient
 
@@ -943,43 +1007,46 @@ def render_temperature_settings(
 
 # Ticks are already displayed with the legend
 
-# Add input controls below the legend but before temperature statistics
-st.subheader("Input Controls")
-input_col1, input_col2 = st.columns(2)
+# Input controls have been moved above the tabs
 
-with input_col1:
-    new_address = st.text_input(
-        label="Location",
-        value=address,
-        key="location",
-        help="Enter an address (e.g., 'New York') or coordinates (e.g., '47.3769° N, 8.5417° E')"
-    )
+# Add temperature statistics in an expandable section
+with st.expander("Temperature Data Details", expanded=False):
+    st.markdown("### Temperature Extremes")
+    st.markdown("This section shows the minimum and maximum temperatures recorded in the dataset.")
+    
+    stat_col1, stat_col2 = st.columns(2)
 
-with input_col2:
-    new_start_date = st.date_input("Start Date", value=start_date, min_value=datetime.date(1940, 1, 1), max_value=datetime.datetime.now()- datetime.timedelta(days=366), key="start_date")
+    # Find indices of maximum and minimum temperatures
+    max_temp_index = df['temperature'].idxmax()
+    min_temp_index = df['temperature'].idxmin()
 
-# Check if inputs have changed and trigger a rerun if needed
-if new_address != address or new_start_date != start_date:
-    st.rerun()
+    with stat_col1:
+        st.markdown("##### Min. Temperature")
+        min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+        min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
+        st.metric(label=min_time_str, value=min_temp_str, border=False)
 
-# Add temperature statistics below the input controls
-stat_col1, stat_col2 = st.columns(2)
-
-# Find indices of maximum and minimum temperatures
-max_temp_index = df['temperature'].idxmax()
-min_temp_index = df['temperature'].idxmin()
-
-with stat_col1:
-    st.markdown("##### Min. Temperature")
-    min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
-    min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
-    st.metric(label=min_time_str, value=min_temp_str, border=False)
-
-with stat_col2:
-    st.markdown("##### Max. Temperature")
-    max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
-    max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
-    st.metric(label=max_time_str, value=max_temp_str, border=False)
+    with stat_col2:
+        st.markdown("##### Max. Temperature")
+        max_time_str = df.iloc[max_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
+        max_temp_str = f"{df.iloc[max_temp_index]['temperature']} °C"
+        st.metric(label=max_time_str, value=max_temp_str, border=False)
+    
+    # Add some additional temperature statistics
+    st.markdown("### Temperature Distribution")
+    
+    # Calculate temperature statistics
+    avg_temp = df['temperature'].mean()
+    median_temp = df['temperature'].median()
+    std_temp = df['temperature'].std()
+    
+    # Display statistics
+    st.markdown(f"""
+    - **Average Temperature**: {avg_temp:.2f} °C
+    - **Median Temperature**: {median_temp:.2f} °C
+    - **Temperature Std. Deviation**: {std_temp:.2f} °C
+    - **Temperature Range**: {min_data_temp:.2f} °C to {max_data_temp:.2f} °C
+    """)
 
 # Split visualization settings into multiple expandable sections in the sidebar
 
