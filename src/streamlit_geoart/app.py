@@ -318,6 +318,65 @@ st.set_page_config(
     page_title="GeoArt", page_icon="🗺️", initial_sidebar_state="expanded"
 )
 
+# Function to get color for a temperature value
+def get_color_for_temp(cmap_name, temp_value, min_temp, max_temp):
+    """
+    Get color for a temperature value from the specified colormap
+    
+    Args:
+        cmap_name: Name of the colormap
+        temp_value: Temperature value to get color for
+        min_temp: Minimum temperature in the range
+        max_temp: Maximum temperature in the range
+        
+    Returns:
+        Hex color code for the temperature value
+    """
+    # Normalize the temperature value to [0, 1]
+    if max_temp == min_temp:  # Avoid division by zero
+        normalized_value = 0.5
+    else:
+        normalized_value = (temp_value - min_temp) / (max_temp - min_temp)
+    
+    # Clamp to [0, 1] range
+    normalized_value = max(0, min(1, normalized_value))
+    
+    try:
+        colormap = mpl.colormaps[cmap_name]
+    except KeyError:
+        # If the colormap with _r suffix doesn't exist, use the base colormap and reverse it
+        base_cmap = cmap_name.replace('_r', '')
+        colormap = mpl.colormaps[base_cmap].reversed()
+    
+    # Get the RGB color and convert to hex
+    rgb_color = colormap(normalized_value)
+    hex_color = mpl.colors.rgb2hex(rgb_color)
+    return hex_color
+
+# Add custom CSS to ensure consistent font size in matplotlib figures
+# and to style the temperature input fields with colormap colors
+st.markdown("""
+<style>
+    /* Ensure consistent font size in matplotlib figures */
+    .stPlotlyChart, .stAgGrid, .stDataFrame {
+        font-size: 14px !important;
+    }
+    
+    /* Ensure matplotlib text is visible regardless of theme */
+    .matplotlib-text {
+        color: white !important;
+    }
+    
+    /* We'll use a different approach with custom elements instead of trying to style the inputs directly */
+    
+    /* Ensure text is readable on colored backgrounds */
+    [data-testid="stNumberInput"] input {
+        color: black !important;
+        font-weight: bold !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title('GeoArt')
 
 st.write("""
@@ -343,7 +402,18 @@ min_data_temp = float(df['temperature'].min())
 max_data_temp = float(df['temperature'].max())
 
 # Temperature range controls
-st.header("Temperature Range Mapping")
+# Use the enhanced colormap selector
+st.header("Colormap Selection")
+colormap_config = colormap_selector(key_prefix="main_colormap", display_mode="grid")
+
+# Update the style in session state
+if colormap_config['reverse']:
+    session.style = f"{colormap_config['colormap']}_r"
+else:
+    session.style = colormap_config['colormap']
+
+# Temperature range mapping section (now part of color selection)
+st.subheader("Temperature Range Mapping")
 st.info(f"Data temperature range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C")
 st.caption("Adjust min/max temperature values to control the color mapping range and enhance visualization.")
 
@@ -359,6 +429,7 @@ if 'max_temp_set' not in st.session_state:
     # Initialize with data max on first load
     if session.max_temp is None:
         session.max_temp = max_data_temp
+
 # Add explanations for contrast operations
 st.markdown("""
 **Contrast Operations:**
@@ -396,7 +467,6 @@ with col2:
         st.session_state['max_temp_set'] = True
         # Force rerun with the new values
         st.rerun()
-        st.rerun()
 
 # Store current values for validation
 current_min = float(session.min_temp)
@@ -404,11 +474,28 @@ current_max = float(session.max_temp)
 
 temp_col1, temp_col2 = st.columns(2)
 with temp_col1:
+    # Calculate min color right before using it
+    try:
+        colormap = mpl.colormaps[session.style]
+    except KeyError:
+        base_cmap = session.style.replace('_r', '')
+        colormap = mpl.colormaps[base_cmap].reversed()
+    min_color = mpl.colors.rgb2hex(colormap(0))
+    
+    # Create a container for the min temperature input and color indicator
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+        <div style="width: 20px; height: 20px; background-color: {min_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
+        <div style="font-weight: bold;">Min Temperature (°C)</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     min_temp = st.number_input(
-        "Min Temperature (°C)",
+        "",  # Empty label since we're using custom label above
         value=current_min,
         step=1.0,
-        help="Minimum temperature for color mapping."
+        help="Minimum temperature for color mapping.",
+        label_visibility="collapsed"  # Hide the default label
     )
     
     # Update session state
@@ -423,13 +510,30 @@ with temp_col1:
         session.min_temp = current_min
 
 with temp_col2:
+    # Calculate max color right before using it
+    try:
+        colormap = mpl.colormaps[session.style]
+    except KeyError:
+        base_cmap = session.style.replace('_r', '')
+        colormap = mpl.colormaps[base_cmap].reversed()
+    max_color = mpl.colors.rgb2hex(colormap(1))
+    
+    # Create a container for the max temperature input and color indicator
+    st.markdown(f"""
+    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+        <div style="width: 20px; height: 20px; background-color: {max_color}; margin-right: 10px; border: 1px solid #ccc;"></div>
+        <div style="font-weight: bold;">Max Temperature (°C)</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # Ensure max_temp is at least min_temp
     max_temp = st.number_input(
-        "Max Temperature (°C)",
+        "",  # Empty label since we're using custom label above
         value=max(current_max, min_temp),
         min_value=min_temp,  # Enforce min_temp as the minimum allowed value
         step=1.0,
-        help="Maximum temperature for color mapping."
+        help="Maximum temperature for color mapping.",
+        label_visibility="collapsed"  # Hide the default label
     )
     
     # Update session state
@@ -440,50 +544,28 @@ with temp_col2:
 # Add a note about the validation
 st.caption("Note: Maximum temperature must be greater than or equal to minimum temperature.")
 
-def get_image_wrapper():
-    # Apply colormap with reverse option if selected
-    cmap = session.style
-    session.image = get_image(session.weather_data, cmap, session.min_temp, session.max_temp)
+def get_temperature_range(min_temp, max_temp, df):
+    """
+    Calculate the applied temperature range without displaying a legend.
+    
+    Args:
+        min_temp: Minimum temperature value (or None to use data min)
+        max_temp: Maximum temperature value (or None to use data max)
+        df: DataFrame containing temperature data
+        
+    Returns:
+        tuple: (min_val, max_val) - The actual min/max values used for normalization
+    """
+    # Get the data range and the applied range
+    data_min = float(df['temperature'].min())
+    data_max = float(df['temperature'].max())
+    applied_min = min_temp if min_temp is not None else data_min
+    applied_max = max_temp if max_temp is not None else data_max
+    
+    return applied_min, applied_max
 
-# Use the enhanced colormap selector
-st.header("Colormap Selection")
-colormap_config = colormap_selector(key_prefix="main_colormap", display_mode="grid")
-
-# Update the style in session state
-if colormap_config['reverse']:
-    session.style = f"{colormap_config['colormap']}_r"
-else:
-    session.style = colormap_config['colormap']
-
-# Generate the image with the selected colormap
-get_image_wrapper()
-
-# Display the generated image
-st.header("Generated Temperature Visualization")
-st.image(session.image.get_image())
-
-# Create a color legend
-cmap_name = session.style
-fig, ax = plt.subplots(figsize=(10, 0.5))
-plt.subplots_adjust(left=0.05, right=0.95)
-
-# Get the actual min/max values used for normalization
-min_val = session.min_temp if session.min_temp is not None else df['temperature'].min()
-max_val = session.max_temp if session.max_temp is not None else df['temperature'].max()
-
-# Create a color bar
-norm = mpl.colors.Normalize(vmin=min_val, vmax=max_val)
-# Make sure we're using the correct colormap name (handle _r suffix)
-try:
-    colormap = mpl.colormaps[cmap_name]
-except KeyError:
-    # If the colormap with _r suffix doesn't exist, use the base colormap and reverse it
-    base_cmap = cmap_name.replace('_r', '')
-    colormap = mpl.colormaps[base_cmap].reversed()
-
-cb = mpl.colorbar.ColorbarBase(ax, cmap=colormap, norm=norm, orientation='horizontal')
-cb.set_label('Temperature (°C)')
-st.pyplot(fig)
+# Get the temperature range values
+min_val, max_val = get_temperature_range(session.min_temp, session.max_temp, df)
 
 # Add explanation of color mapping
 if st.session_state.get('min_temp_set', False) or st.session_state.get('max_temp_set', False):
@@ -496,6 +578,20 @@ if st.session_state.get('min_temp_set', False) or st.session_state.get('max_temp
     """)
 else:
     st.caption("Full contrast stretching applied (using entire data range). Use the temperature controls above to enhance specific ranges.")
+
+def get_image_wrapper():
+    # Apply colormap with reverse option if selected
+    cmap = session.style
+    session.image = get_image(session.weather_data, cmap, session.min_temp, session.max_temp)
+
+# Generate the image with the selected colormap
+get_image_wrapper()
+
+# Display the generated image
+st.header("Generated Temperature Visualization")
+st.image(session.image.get_image())
+
+# This section has been moved to the color selection area
 
 col1, col2, col3 = st.columns(3)
 
@@ -513,7 +609,7 @@ with col2:
     st.markdown("##### Min. Temperature")
     min_time_str = df.iloc[min_temp_index]['time'].strftime('%Y-%m-%d %H:%M:%S')
     min_temp_str = f"{df.iloc[min_temp_index]['temperature']} °C"
-    st.metric(label=min_time_str, value=min_temp_str)
+    st.metric(label=min_time_str, value=min_temp_str, border=False)
 
 with col3:
     st.markdown("##### Mean Temperature")
