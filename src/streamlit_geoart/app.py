@@ -126,7 +126,7 @@ def display_colormap_grid(colormap_categories, selected_category=None, key_prefi
     else:
         categories_to_show = [selected_category]
     
-    # Category descriptions
+    # Simplified category descriptions
     category_descriptions = {
         'Sequential': "Colors that progress from low to high. Good for continuous data.",
         'Diverging': "Colors that diverge from a central point. Good for data with a meaningful center point.",
@@ -138,9 +138,7 @@ def display_colormap_grid(colormap_categories, selected_category=None, key_prefi
     
     for i, category in enumerate(categories_to_show):
         with tabs[i]:
-            # Display category description
-            st.info(category_descriptions.get(category, ""))
-            st.caption(f"{len(colormap_categories[category])} colormaps")
+            # Category descriptions and counts removed as per user request
             
             # Get all colormap names in this category
             cmap_names = colormap_categories[category]
@@ -210,9 +208,33 @@ def colormap_selector(key_prefix="colormap", display_mode="grid", use_expander=T
     
     # Main area
     
+    # Get the currently selected colormap
+    selected_cmap = st.session_state[f"{key_prefix}_selected"]
+    
+    # Show current selection at the top
+    st.subheader(f"Current Selection: {selected_cmap}")
+    
+    # Get the display colormap name with _r suffix if reversed
+    display_cmap = f"{selected_cmap}_r" if st.session_state[f"{key_prefix}_reverse"] else selected_cmap
+    
+    # Show preview of selected colormap with reverse option
+    fig = create_colormap_preview(display_cmap)
+    st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+    plt.close(fig)  # Close figure to prevent memory leaks
+    
+    # Options for the selected colormap after the plot
+    reverse = st.checkbox("Reverse Colormap", value=st.session_state[f"{key_prefix}_reverse"], key=f"{key_prefix}_reverse_checkbox", help="Invert the colormap direction")
+    st.session_state[f"{key_prefix}_reverse"] = reverse
+    
+    # If reverse option changed, rerun to update the preview
+    if reverse != st.session_state[f"{key_prefix}_reverse"]:
+        st.rerun()
+    
     # Display colormap grid - either in an expander or directly
     if use_expander:
-        with st.expander("Select a Colormap", expanded=False):
+        with st.expander("Select a Different Colormap", expanded=False):
+            # Colormap descriptions removed as per user request
+            
             selected_from_grid = display_colormap_grid(
                 all_categories,
                 key_prefix=f"{key_prefix}_grid"
@@ -223,7 +245,10 @@ def colormap_selector(key_prefix="colormap", display_mode="grid", use_expander=T
                 st.session_state[f"{key_prefix}_selected"] = selected_from_grid
     else:
         # Display directly without an expander
-        st.subheader("Select a Colormap")
+        st.subheader("Select a Different Colormap")
+        
+        # Colormap descriptions removed as per user request
+        
         selected_from_grid = display_colormap_grid(
             all_categories,
             key_prefix=f"{key_prefix}_grid"
@@ -232,22 +257,6 @@ def colormap_selector(key_prefix="colormap", display_mode="grid", use_expander=T
         # Update selected colormap if a new one was selected from the grid
         if selected_from_grid:
             st.session_state[f"{key_prefix}_selected"] = selected_from_grid
-    
-    # Get the currently selected colormap
-    selected_cmap = st.session_state[f"{key_prefix}_selected"]
-    
-    # Options for the selected colormap
-    reverse = st.checkbox("Reverse Colormap", value=st.session_state[f"{key_prefix}_reverse"], key=f"{key_prefix}_reverse_checkbox", help="Invert the colormap direction")
-    st.session_state[f"{key_prefix}_reverse"] = reverse
-    
-    # Get the display colormap name with _r suffix if reversed
-    display_cmap = f"{selected_cmap}_r" if reverse else selected_cmap
-    
-    st.subheader(f"Current Selection: {display_cmap}")
-    # Show preview of selected colormap with reverse option
-    fig = create_colormap_preview(display_cmap)
-    st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
-    plt.close(fig)  # Close figure to prevent memory leaks
 
     # Return the selected configuration
     return {
@@ -944,6 +953,8 @@ st.markdown(tick_html, unsafe_allow_html=True)
 
 # 1. Colormap Selection
 with st.sidebar.expander("Colormap Selection", expanded=False):
+    # Colormap introduction removed as per user request
+    
     colormap_config = colormap_selector(key_prefix="main_colormap", display_mode="grid", use_expander=False)
     
     # Update the style in session state
