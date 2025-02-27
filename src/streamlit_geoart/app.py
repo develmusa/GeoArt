@@ -584,6 +584,41 @@ slider_max = float(st.session_state['custom_range_max'])
 # Calculate appropriate step size
 slider_step = (slider_max - slider_min) / 100  # 100 steps across the range
 
+# Add custom CSS to reduce spacing between slider and indicators
+st.markdown("""
+<style>
+/* Reduce bottom margin of slider container */
+.stSlider {
+    margin-bottom: -15px !important;
+}
+
+/* Style for data range indicators */
+.data-range-indicator {
+    position: relative;
+    height: 25px;
+    margin-top: -5px;
+    margin-bottom: 5px;
+    width: 100%;
+}
+.tick-mark {
+    position: absolute;
+    width: 2px;
+    height: 8px;
+    background-color: rgba(255,255,255,0.9);
+    transform: translateX(-50%);
+}
+.tick-label {
+    position: absolute;
+    font-size: 12px;
+    color: rgba(255,255,255,0.9);
+    transform: translateX(-50%);
+    top: 8px;
+    white-space: nowrap;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Create a slider with the current min/max values
 temp_range = st.slider(
     "Temperature Range",
@@ -596,28 +631,58 @@ temp_range = st.slider(
     help="Drag the handles to adjust the minimum and maximum temperature values for color mapping."
 )
 
-# Update the session state based on slider values
-if temp_range != (current_min, current_max):
-    update_temp_range(temp_range)
-    # Force rerun to update the visualization
-    st.rerun()
-
-# Show data range indicators on the slider
+# Show data range indicators below the slider
 # Calculate positions as percentages of the slider width
 min_pos = (min_data_temp - slider_min) / (slider_max - slider_min) * 100
 max_pos = (max_data_temp - slider_min) / (slider_max - slider_min) * 100
 
-# Only show indicators if they're within the visible range (0-100%)
-if 0 <= min_pos <= 100 or 0 <= max_pos <= 100:
-    # Add data range indicators using custom HTML/CSS
-    st.markdown(f"""
-    <div style="position: relative; height: 20px; margin-top: -15px; margin-bottom: 10px;">
-        {f'<div style="position: absolute; left: {min_pos}%; transform: translateX(-50%); width: 2px; height: 10px; background-color: rgba(255,255,255,0.7);"></div>' if 0 <= min_pos <= 100 else ''}
-        {f'<div style="position: absolute; left: {min_pos}%; transform: translateX(-50%); top: 12px; font-size: 10px; color: rgba(255,255,255,0.7);">Data Min</div>' if 0 <= min_pos <= 100 else ''}
-        {f'<div style="position: absolute; left: {max_pos}%; transform: translateX(-50%); width: 2px; height: 10px; background-color: rgba(255,255,255,0.7);"></div>' if 0 <= max_pos <= 100 else ''}
-        {f'<div style="position: absolute; left: {max_pos}%; transform: translateX(-50%); top: 12px; font-size: 10px; color: rgba(255,255,255,0.7);">Data Max</div>' if 0 <= max_pos <= 100 else ''}
-    </div>
-    """, unsafe_allow_html=True)
+# Add the data range indicators with temperature values
+st.markdown(f"""
+<div class="data-range-indicator">
+    {f'<div class="tick-mark" style="left: {min_pos}%;"></div>' if 0 <= min_pos <= 100 else ''}
+    {f'<div class="tick-label" style="left: {min_pos}%;">Data Min: {min_data_temp:.1f}°C</div>' if 0 <= min_pos <= 100 else ''}
+    {f'<div class="tick-mark" style="left: {max_pos}%;"></div>' if 0 <= max_pos <= 100 else ''}
+    {f'<div class="tick-label" style="left: {max_pos}%;">Data Max: {max_data_temp:.1f}°C</div>' if 0 <= max_pos <= 100 else ''}
+</div>
+""", unsafe_allow_html=True)
+
+# Add number inputs for precise temperature control
+st.caption("Fine-tune temperature values with precise inputs:")
+temp_input_col1, temp_input_col2 = st.columns(2)
+
+with temp_input_col1:
+    min_temp_input = st.number_input(
+        "Min Temperature (°C)",
+        value=temp_range[0],
+        min_value=slider_min,
+        max_value=temp_range[1] - slider_step,  # Ensure min < max
+        step=slider_step,
+        format="%.1f",
+        help="Minimum temperature for color mapping."
+    )
+
+with temp_input_col2:
+    max_temp_input = st.number_input(
+        "Max Temperature (°C)",
+        value=temp_range[1],
+        min_value=min_temp_input + slider_step,  # Ensure max > min
+        max_value=slider_max,
+        step=slider_step,
+        format="%.1f",
+        help="Maximum temperature for color mapping."
+    )
+
+# Update session state based on either slider or number inputs
+if (min_temp_input, max_temp_input) != temp_range:
+    # Number inputs have changed
+    update_temp_range((min_temp_input, max_temp_input))
+    # Force rerun to update the visualization
+    st.rerun()
+elif temp_range != (current_min, current_max):
+    # Slider has changed
+    update_temp_range(temp_range)
+    # Force rerun to update the visualization
+    st.rerun()
 
 # Add explanations for contrast operations
 st.markdown("""
