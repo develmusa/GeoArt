@@ -411,11 +411,7 @@ st.markdown("""
     
     /* We'll use a different approach with custom elements instead of trying to style the inputs directly */
     
-    /* Ensure text is readable on colored backgrounds */
-    [data-testid="stNumberInput"] input {
-        color: black !important;
-        font-weight: bold !important;
-    }
+    /* Number input styling removed as per user request */
 </style>
 """, unsafe_allow_html=True)
 st.title('GeoArt')
@@ -693,19 +689,8 @@ def render_data_range_indicators(
         data_min: Minimum temperature in the data
         data_max: Maximum temperature in the data
     """
-    # Calculate positions as percentages of the slider width
-    min_pos = (data_min - slider_min) / (slider_max - slider_min) * 100
-    max_pos = (data_max - slider_min) / (slider_max - slider_min) * 100
-    
-    # Add the data range indicators with temperature values
-    st.markdown(f"""
-    <div class="data-range-indicator">
-        {f'<div class="tick-mark" style="left: {min_pos}%;"></div>' if 0 <= min_pos <= 100 else ''}
-        {f'<div class="tick-label" style="left: {min_pos}%;">Data Min: {data_min:.1f}°C</div>' if 0 <= min_pos <= 100 else ''}
-        {f'<div class="tick-mark" style="left: {max_pos}%;"></div>' if 0 <= max_pos <= 100 else ''}
-        {f'<div class="tick-label" style="left: {max_pos}%;">Data Max: {data_max:.1f}°C</div>' if 0 <= max_pos <= 100 else ''}
-    </div>
-    """, unsafe_allow_html=True)
+    # Data range indicators removed as per user request
+    pass
 
 def render_temperature_range_slider(
     session: SessionStateManager,
@@ -748,6 +733,16 @@ def render_temperature_range_slider(
     
     # Render data range indicators
     render_data_range_indicators(slider_min, slider_max, min_data_temp, max_data_temp)
+    
+    # Add reset button in a more prominent location with full width
+    if st.button("Reset Temperature Range",
+                key="reset_temp_range_button",
+                help="Reset to data range for optimal visualization",
+                use_container_width=True):
+        # Set the temperature values to the data range
+        session.update_temp_range(min_data_temp, max_data_temp, min_data_temp, max_data_temp)
+        # Force rerun with the new values
+        st.rerun()
     
     # Update session state if slider values changed
     if temp_range != (current_min, current_max):
@@ -866,14 +861,7 @@ def render_advanced_settings(
         session.custom_range_max = custom_max
         st.rerun()
     
-    # Add reset button
-    if st.button("Reset to Default Range",
-                key="reset_temp_range_button",
-                help="Resets to the full data range. This maximizes the use of all available colors across the entire data range."):
-        # Set the temperature values to the data range
-        session.update_temp_range(min_data_temp, max_data_temp, min_data_temp, max_data_temp)
-        # Force rerun with the new values
-        st.rerun()
+    # Reset button removed from advanced settings
 
 def render_temperature_settings(
     session: SessionStateManager,
@@ -895,30 +883,13 @@ def render_temperature_settings(
     
     # Temperature Range section
     st.subheader("Temperature Range")
-    st.info(f"Data temperature range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C")
-    st.caption("Adjust the temperature range using the slider to control the color mapping and enhance visualization.")
+    st.caption("""
+    Adjust the temperature range to control how colors are mapped to temperatures in the visualization.
     
-    # Get the current colormap
-    try:
-        colormap = mpl.colormaps[session.style]
-    except KeyError:
-        base_cmap = session.style.replace('_r', '')
-        colormap = mpl.colormaps[base_cmap].reversed()
-    
-    # Calculate display range for gradient bar
-    display_min = session.custom_range_min
-    display_max = session.custom_range_max
-    
-    # Create the gradient bar visualization with appropriate range
-    gradient_fig = render_temperature_gradient(
-        session.style,
-        display_min,
-        display_max
-    )
-    
-    # Display the gradient bar
-    st.pyplot(gradient_fig, use_container_width=True)
-    plt.close(gradient_fig)  # Close figure to prevent memory leaks
+    - **Narrower range**: Creates higher contrast, making small temperature differences more visible
+    - **Wider range**: Shows the full temperature spectrum with more subtle color transitions
+    - **Reset button**: Returns to the optimal range for this dataset
+    """)
     
     # Set slider range to use custom range limits
     slider_min = float(session.custom_range_min)
@@ -928,15 +899,7 @@ def render_temperature_settings(
     # Render temperature range slider
     temp_range = render_temperature_range_slider(session, min_data_temp, max_data_temp)
     
-    # Add explanation of color mapping
-    if session.min_temp_set or session.max_temp_set:
-        st.info(f"""
-        **Custom Contrast Mapping Applied:**
-        - Full data range: {min_data_temp:.1f}°C to {max_data_temp:.1f}°C
-        - Current mapping range: {session.min_temp:.1f}°C to {session.max_temp:.1f}°C
-        
-        Values outside this range will be clipped to the min/max colors, enhancing contrast within the selected range.
-        """)
+    # No explanation needed as per user request
     
     # Render fine-tuning temperature inputs
     render_temperature_inputs(
