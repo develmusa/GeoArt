@@ -9,7 +9,7 @@ from geoart import weather_data
 from geoart.image import Image, create_image
 from geoart.weather_data import WeatherData
 from pydantic import BaseModel, Field
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Tuple, Optional, Callable
 import matplotlib as mpl
 from matplotlib import pyplot as plt
 import numpy as np
@@ -568,6 +568,138 @@ with input_col2:
 # Check if inputs have changed and trigger a rerun if needed
 if new_address != address or new_start_date != start_date:
     st.rerun()
+
+# Add a popover for colormap selection
+with st.popover("🎨 Change Colors", help="Click to change the visualization colors"):
+    # Simplified colormap selector with dropdown
+    st.subheader("Colormap Selection")
+    
+    # Get all colormap categories
+    all_categories = get_colormap_categories()
+    
+    # Flatten all colormaps into a single list
+    all_colormaps = []
+    for category, cmaps in all_categories.items():
+        all_colormaps.extend(cmaps)
+    
+    # Sort alphabetically for easier selection
+    all_colormaps.sort()
+    
+    # Initialize session state for selected colormap if not exists
+    if "popover_colormap_selected" not in st.session_state:
+        st.session_state["popover_colormap_selected"] = session.style.replace('_r', '')
+    
+    if "popover_colormap_reverse" not in st.session_state:
+        st.session_state["popover_colormap_reverse"] = '_r' in session.style
+    
+    # Create a dropdown for colormap selection
+    selected_cmap = st.selectbox(
+        "Select a colormap:",
+        all_colormaps,
+        index=all_colormaps.index(st.session_state["popover_colormap_selected"]) if st.session_state["popover_colormap_selected"] in all_colormaps else 0,
+        key="popover_colormap_dropdown"
+    )
+    
+    # Update session state
+    st.session_state["popover_colormap_selected"] = selected_cmap
+    
+    # Show preview of selected colormap
+    display_cmap = f"{selected_cmap}_r" if st.session_state["popover_colormap_reverse"] else selected_cmap
+    fig = create_colormap_preview(display_cmap, width=400, height=30)
+    st.pyplot(fig, bbox_inches='tight', pad_inches=0, use_container_width=True)
+    plt.close(fig)  # Close figure to prevent memory leaks
+    
+    # Reverse option
+    reverse = st.checkbox(
+        "Reverse Colormap",
+        value=st.session_state["popover_colormap_reverse"],
+        key="popover_colormap_reverse_checkbox",
+        help="Invert the colormap direction"
+    )
+    st.session_state["popover_colormap_reverse"] = reverse
+    
+    # Update the style in session state when changed in the popover
+    if reverse:
+        new_style = f"{selected_cmap}_r"
+    else:
+        new_style = selected_cmap
+    
+    # Only update and rerun if the style has changed
+    if new_style != session.style:
+        session.style = new_style
+        st.rerun()
+
+# Add a popover with tabs for additional options
+with st.popover("📊 View Data Analysis", help="Click to see additional data analysis options"):
+    # Create tabs inside the popover
+    popover_tab1, popover_tab2, popover_tab3 = st.tabs(["Temperature Stats", "Seasonal Analysis", "Export Options"])
+    
+    with popover_tab1:
+        st.subheader("Temperature Statistics")
+        
+        # Calculate temperature statistics
+        avg_temp = df['temperature'].mean()
+        median_temp = df['temperature'].median()
+        std_temp = df['temperature'].std()
+        
+        # Display statistics in a more compact format
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Average Temperature", f"{avg_temp:.2f} °C")
+            st.metric("Min Temperature", f"{min_data_temp:.2f} °C")
+        with col2:
+            st.metric("Median Temperature", f"{median_temp:.2f} °C")
+            st.metric("Max Temperature", f"{max_data_temp:.2f} °C")
+        
+        st.metric("Temperature Range", f"{max_data_temp - min_data_temp:.2f} °C")
+        st.metric("Standard Deviation", f"{std_temp:.2f} °C")
+    
+    with popover_tab2:
+        st.subheader("Seasonal Temperature Analysis")
+        
+        # Add a simple seasonal analysis
+        # Convert time to datetime and extract month
+        df['month'] = pd.to_datetime(df['time']).dt.month
+        
+        # Group by month and calculate statistics
+        monthly_stats = df.groupby('month')['temperature'].agg(['mean', 'min', 'max'])
+        monthly_stats.index = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        monthly_stats.columns = ['Average', 'Minimum', 'Maximum']
+        
+        # Display the monthly statistics
+        st.dataframe(monthly_stats.style.format("{:.1f} °C"))
+        
+        st.caption("Monthly temperature statistics for the selected location and year.")
+    
+    with popover_tab3:
+        st.subheader("Export Options")
+        
+        # Add export options
+        st.write("Download the visualization or data:")
+        
+        # Download buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            st.download_button(
+                label="Download CSV Data",
+                data=df.to_csv().encode('utf-8'),
+                file_name=f"temperature_data_{address}_{start_date.year}.csv",
+                mime="text/csv",
+                help="Download the raw temperature data as a CSV file"
+            )
+        
+        with col2:
+            # This is just a placeholder - in a real app you would generate and provide the actual image
+            st.download_button(
+                label="Download Image",
+                data=b"Placeholder for image data",  # Placeholder
+                file_name=f"temperature_viz_{address}_{start_date.year}.png",
+                mime="image/png",
+                help="Download the visualization as a PNG image",
+                disabled=True  # Disabled since we're not actually generating the image file
+            )
+        
+        st.info("Note: Image download is currently disabled in this demo.")
 
 # Create tabs for description, usage instructions, and technical details
 description_tab, usage_tab, technical_tab = st.tabs(["Description", "How to Use", "Technical Details"])
